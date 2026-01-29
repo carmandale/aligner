@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+#
+# Aligner CLI - Visual feedback loop for AI agents
+#
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(dirname "$SCRIPT_DIR")"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+usage() {
+  cat <<EOF
+⚡ Aligner - Visual feedback loop for AI agents
+
+Usage: aligner <command>
+
+Commands:
+  start       Start Aligner server and viewer
+  server      Start only the API server
+  viewer      Start only the web viewer
+  list        List all diagrams
+  open        Open Aligner in browser
+  help        Show this help
+
+Environment:
+  ALIGNER_DIR    Diagram directory (default: ~/.aligner)
+  PORT           Server port (default: 3001)
+
+Examples:
+  aligner start              # Start everything
+  aligner list               # Show available diagrams
+  aligner open               # Open in browser
+
+EOF
+}
+
+start_server() {
+  echo -e "${BLUE}Starting Aligner server...${NC}"
+  cd "$ROOT_DIR/server"
+  node index.js &
+  SERVER_PID=$!
+  echo $SERVER_PID > /tmp/aligner-server.pid
+}
+
+start_viewer() {
+  echo -e "${BLUE}Starting Aligner viewer...${NC}"
+  cd "$ROOT_DIR"
+  npm run dev &
+  VIEWER_PID=$!
+  echo $VIEWER_PID > /tmp/aligner-viewer.pid
+}
+
+stop_all() {
+  echo -e "${YELLOW}Stopping Aligner...${NC}"
+  [ -f /tmp/aligner-server.pid ] && kill $(cat /tmp/aligner-server.pid) 2>/dev/null || true
+  [ -f /tmp/aligner-viewer.pid ] && kill $(cat /tmp/aligner-viewer.pid) 2>/dev/null || true
+  rm -f /tmp/aligner-server.pid /tmp/aligner-viewer.pid
+}
+
+list_diagrams() {
+  ALIGNER_DIR="${ALIGNER_DIR:-$HOME/.aligner}"
+  echo -e "${BLUE}Diagrams in ${ALIGNER_DIR}:${NC}"
+  echo ""
+  for f in "$ALIGNER_DIR"/*.json; do
+    [ -f "$f" ] || continue
+    name=$(basename "$f")
+    title=$(grep -o '"name"[[:space:]]*:[[:space:]]*"[^"]*"' "$f" | head -1 | cut -d'"' -f4)
+    echo -e "  ${GREEN}•${NC} ${name} - ${title:-Untitled}"
+  done
+}
+
+open_browser() {
+  sleep 2
+  if command -v open &>/dev/null; then
+    open "http://localhost:5173"
+  elif command -v xdg-open &>/dev/null; then
+    xdg-open "http://localhost:5173"
+  fi
+}
+
+case "${1:-}" in
+  start)
+    trap stop_all EXIT
+    start_server
+    sleep 1
+    start_viewer
+    open_browser
+    echo -e "${GREEN}✓ Aligner running${NC}"
+    echo -e "  Server: http://localhost:3001"
+    echo -e "  Viewer: http://localhost:5173"
+    echo ""
+    echo "Press Ctrl+C to stop"
+    wait
+    ;;
+  server)
+    cd "$ROOT_DIR/server"
+    exec node index.js
+    ;;
+  viewer)
+    cd "$ROOT_DIR"
+    exec npm run dev
+    ;;
+  list)
+    list_diagrams
+    ;;
+  open)
+    open_browser
+    ;;
+  help|--help|-h|"")
+    usage
+    ;;
+  *)
+    echo -e "${RED}Unknown command: $1${NC}"
+    usage
+    exit 1
+    ;;
+esac
