@@ -1,57 +1,61 @@
 # ⚡ Aligner
 
-Visual feedback loop for AI agents. Claude (or any AI) writes JSON, you edit visually, changes sync back.
+Visual feedback loop for AI agents. You describe what you want, the AI generates a diagram, you edit it visually, and the AI sees your changes.
 
 **Inspired by [CJ Hess's Flowy concept](https://x.com/seejayhess/status/2014448070214197485)**
 
-## How It Works
+## The Loop
 
 ```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   AI Agent      │────▶│   ~/.aligner/   │────▶│   Browser UI    │
-│  writes JSON    │     │   diagram.json  │     │  renders flow   │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
-         ▲                       │                       │
-         │                       │                       ▼
-         │               ┌───────┴───────┐       ┌─────────────────┐
-         └───────────────│   File Sync   │◀──────│  User drags     │
-                         │   (watches)   │       │  nodes around   │
-                         └───────────────┘       └─────────────────┘
+┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
+│   AI Agent      │────────▶│  ~/.aligner/    │────────▶│   Browser UI    │
+│  generates JSON │         │  diagram.json   │         │  renders flow   │
+└─────────────────┘         └─────────────────┘         └─────────────────┘
+         ▲                                                       │
+         │                                                       │
+         │                  ┌─────────────────┐                  │
+         └──────────────────│   You edit &    │◀─────────────────┘
+                            │   comment       │
+                            └─────────────────┘
 ```
-
-1. **Agent writes JSON** → `~/.aligner/my-diagram.json`
-2. **Aligner renders** → Interactive flowchart in browser
-3. **You edit visually** → Drag nodes, adjust layout
-4. **JSON updates** → File syncs automatically
-5. **Agent reads changes** → Continues iteration
 
 ## Quick Start
 
 ```bash
-# Clone and install
+# Clone
 git clone https://github.com/carmandale/aligner.git
 cd aligner
+
+# Install dependencies
 npm install
 cd server && npm install && cd ..
 
-# Start both server and viewer
-./bin/aligner start
+# Start (two terminals)
+# Terminal 1: API server
+cd server && node index.js
 
-# Or run separately
-./bin/aligner server    # Terminal 1: API server on :3001
-./bin/aligner viewer    # Terminal 2: Web UI on :5173
+# Terminal 2: Web UI
+npm run dev
+
+# Open browser
+open http://localhost:5173
 ```
 
-Open http://localhost:5173
+## Features
+
+- **Interactive canvas** - Drag nodes, create connections, delete with backspace
+- **Threaded comments** - Click a node, add comments, AI can reply
+- **Real-time sync** - Visual edits save to JSON automatically
+- **AI-readable** - Simple JSON format any LLM can generate and parse
 
 ## JSON Schema
 
-Aligner uses a simple JSON format that's easy for LLMs to generate:
+Diagrams are stored in `~/.aligner/` as JSON files:
 
 ```json
 {
   "version": "1.0",
-  "name": "My Flow",
+  "name": "My Diagram",
   "type": "flowchart",
   "nodes": [
     {
@@ -59,12 +63,16 @@ Aligner uses a simple JSON format that's easy for LLMs to generate:
       "type": "rect",
       "label": "Start Here",
       "position": { "x": 100, "y": 100 },
-      "size": { "width": 150, "height": 60 },
+      "size": { "width": 150, "height": 50 },
       "style": {
         "fill": "#dbeafe",
         "stroke": "#3b82f6",
         "cornerRadius": 8
-      }
+      },
+      "comments": [
+        { "from": "user", "text": "Should this be the entry point?" },
+        { "from": "agent", "text": "Yes, all flows start here." }
+      ]
     }
   ],
   "edges": [
@@ -73,105 +81,113 @@ Aligner uses a simple JSON format that's easy for LLMs to generate:
       "from": "node-1",
       "to": "node-2",
       "type": "arrow",
-      "label": "next"
+      "label": "next step"
     }
   ],
   "metadata": {
-    "description": "What this diagram shows"
+    "description": "What this diagram represents",
+    "created": "2024-01-01T00:00:00.000Z",
+    "modified": "2024-01-01T00:00:00.000Z"
   }
 }
 ```
 
-### Node Types
-- `rect` - Rectangle
-- `circle` - Circle
-- `diamond` - Decision diamond
-- `text` - Text label
-- `group` - Container for nested nodes
+### Node Properties
 
-### Edge Types
-- `arrow` - Solid line with arrow
-- `dashed` - Dashed line with arrow
-- `line` - Solid line, no arrow
-- `orthogonal` - Right-angle connections
-- `curved` - Bezier curves
+| Property | Type | Description |
+|----------|------|-------------|
+| `id` | string | Unique identifier |
+| `type` | string | `rect`, `circle`, `diamond` |
+| `label` | string | Text displayed (supports `\n` for newlines) |
+| `position` | object | `{ x: number, y: number }` |
+| `size` | object | `{ width: number, height: number }` |
+| `style.fill` | string | Background color (hex) |
+| `style.stroke` | string | Border color (hex) |
+| `style.cornerRadius` | number | Border radius in pixels |
+| `comments` | array | Thread of `{ from: "user"|"agent", text: string }` |
 
-### Style Options
-- `fill` - Background color
-- `stroke` - Border color
-- `strokeWidth` - Border thickness
-- `cornerRadius` - Rounded corners (for rect)
-- `fontSize` - Text size
-- `fontColor` - Text color
-- `shadow` - Drop shadow (boolean)
+### Edge Properties
 
-## Use with AI Agents
+| Property | Type | Description |
+|----------|------|-------------|
+| `id` | string | Unique identifier |
+| `from` | string | Source node ID |
+| `to` | string | Target node ID |
+| `type` | string | `arrow`, `dashed`, `line` |
+| `label` | string | Text on the edge (optional) |
 
-### Example Prompt for Claude
+## Using with AI Agents
+
+### Reading Comments
+
+```bash
+# Check for user feedback
+cat ~/.aligner/my-diagram.json | jq '.nodes[] | select(.comments) | {label, comments}'
+```
+
+### Generating a Diagram
+
+Prompt your AI:
 
 ```
-Create a flowchart in Aligner JSON format showing a user authentication flow.
-Save it to ~/.aligner/auth-flow.json
+Create an Aligner diagram showing a user login flow.
+Save it to ~/.aligner/login-flow.json
 
-Use the schema:
-- nodes: array of {id, type, label, position, size, style}
-- edges: array of {id, from, to, type, label}
+Use this format:
+- nodes: array with id, type, label, position, size, style
+- edges: array with id, from, to, type
 - Node types: rect, circle, diamond
 - Edge types: arrow, dashed
 ```
 
-### Claude Code Skill
+### Replying to Comments
 
-Create `~/.agent-config/skills/aligner/SKILL.md`:
+When you read a user comment, add your reply to the comments array:
 
-```markdown
-# Aligner - Visual Diagram Editor
-
-Generate flowcharts and UI mockups in Aligner JSON format.
-
-## Schema
-[... include the JSON schema ...]
-
-## Usage
-Write JSON to ~/.aligner/<name>.json
-User views/edits at http://localhost:5173
-Read back to see their changes
-```
-
-## CLI Commands
-
-```bash
-aligner start     # Start server + viewer
-aligner server    # Start only API server
-aligner viewer    # Start only web UI
-aligner list      # List all diagrams
-aligner open      # Open browser
-aligner help      # Show help
-```
-
-## Directory Structure
-
-```
-~/.aligner/               # Your diagrams live here
-├── example-flow.json
-├── auth-flow.json
-└── ui-mockup.json
-
-~/dev/aligner/            # The app
-├── src/                  # React frontend
-├── server/               # Express API
-└── bin/aligner           # CLI
+```json
+{
+  "comments": [
+    { "from": "user", "text": "Is this correct?" },
+    { "from": "agent", "text": "Yes, I verified this matches the codebase." }
+  ]
+}
 ```
 
 ## API Endpoints
 
+The server runs on port 3001:
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/diagrams` | List all diagrams |
-| GET | `/diagram/:filename` | Get diagram JSON |
-| PUT | `/diagram/:filename` | Update diagram |
-| POST | `/diagram` | Create new diagram |
-| DELETE | `/diagram/:filename` | Delete diagram |
+| `GET` | `/diagrams` | List all diagrams |
+| `GET` | `/diagram/:filename` | Get diagram JSON |
+| `PUT` | `/diagram/:filename` | Update diagram |
+| `POST` | `/diagram` | Create new diagram |
+| `DELETE` | `/diagram/:filename` | Delete diagram |
+
+## Project Structure
+
+```
+~/.aligner/                    # Your diagrams
+├── example-flow.json
+└── my-diagram.json
+
+~/dev/aligner/                 # The app
+├── src/
+│   ├── App.tsx                # Main React component
+│   ├── components/
+│   │   └── AlignerNode.tsx    # Custom node with animations
+│   └── styles.css             # Tailwind + custom styles
+├── server/
+│   └── index.js               # Express API server
+└── package.json
+```
+
+## Tech Stack
+
+- **Frontend**: React, Vite, ReactFlow, Framer Motion, Tailwind CSS
+- **Backend**: Express.js, file system watcher
+- **Icons**: Lucide React
 
 ## License
 
