@@ -9,9 +9,9 @@ import express from 'express';
 import cors from 'cors';
 import fs from 'fs/promises';
 import path from 'path';
-import { watch } from 'fs';
 import { homedir } from 'os';
 import { loadRegistry, saveRegistry, registerRepo, unregisterRepo, getAlignerDir } from './registry.js';
+import { createWatcher } from './watcher.js';
 
 const PORT = process.env.PORT || 3001;
 const ALIGNER_DIR = process.env.ALIGNER_DIR || path.join(homedir(), '.aligner');
@@ -345,6 +345,11 @@ app.post('/repos/register', async (req, res) => {
     // Register (idempotent)
     const repo = await registerRepo(repoPath, name);
 
+    // Add path to watcher if watcher is running
+    if (diagramWatcher) {
+      diagramWatcher.addPath(repoPath);
+    }
+
     // Return updated list
     const registry = await loadRegistry();
     res.json({ success: true, repo, repos: registry.repos });
@@ -373,6 +378,11 @@ app.delete('/repos/:encodedPath', async (req, res) => {
 
     // Unregister
     await unregisterRepo(repoPath);
+
+    // Remove path from watcher if watcher is running
+    if (diagramWatcher) {
+      diagramWatcher.removePath(repoPath);
+    }
 
     // Return updated list
     const updated = await loadRegistry();
@@ -420,17 +430,47 @@ app.patch('/repos/:encodedPath', async (req, res) => {
   }
 });
 
-// Watch for file changes and log
-function watchDirectory() {
+// Global watcher instance
+let diagramWatcher = null;
+
+// Setup multi-repo file watcher
+async function setupWatcher() {
   try {
-    watch(ALIGNER_DIR, (eventType, filename) => {
-      if (filename?.endsWith('.json')) {
-        console.log(`👁️  ${eventType}: ${filename}`);
-      }
+    // Load registry to get all repo paths
+    const registry = await loadRegistry();
+    const repos = registry.repos || [];
+
+    // Build paths to watch
+    // For repos: watch repo/.aligner/
+    // For global: watch ~/.aligner/global/ (not ~/.aligner/global/.aligner/)
+    const pathsToWatch = [
+      ...repos.map(repo => ({ path: repo.path, name: repo.name })),
+      // Global directory is a special case - pass parent so watcher adds .aligner
+      { path: path.join(ALIGNER_DIR, 'global'), name: 'Global', isGlobal: true }
+    ];
+
+    // Create and start watcher
+    diagramWatcher = createWatcher(pathsToWatch);
+
+    // Log events for debugging
+    diagramWatcher.on('add', ({ filename, repo }) => {
+      console.log(`👁️  File added: ${filename} (${repo})`);
     });
-    console.log(`👁️  Watching for changes...`);
+
+    diagramWatcher.on('change', ({ filename, repo }) => {
+      console.log(`👁️  File changed: ${filename} (${repo})`);
+    });
+
+    diagramWatcher.on('unlink', ({ filename, repo }) => {
+      console.log(`👁️  File removed: ${filename} (${repo})`);
+    });
+
+    diagramWatcher.on('error', (error) => {
+      console.error('👁️  Watcher error:', error);
+    });
+
   } catch (err) {
-    console.error('Watch error:', err);
+    console.error('Failed to setup watcher:', err);
   }
 }
 
@@ -438,7 +478,7 @@ function watchDirectory() {
 async function start() {
   await ensureDir();
   await migrateOrphanedDiagrams();
-  watchDirectory();
+  await setupWatcher();
 
   app.listen(PORT, () => {
     console.log(`
