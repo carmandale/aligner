@@ -10,6 +10,7 @@ import cors from 'cors';
 import fs from 'fs/promises';
 import path from 'path';
 import { homedir } from 'os';
+import { WebSocketServer } from 'ws';
 import { loadRegistry, saveRegistry, registerRepo, unregisterRepo, getAlignerDir } from './registry.js';
 import { createWatcher } from './watcher.js';
 
@@ -433,6 +434,19 @@ app.patch('/repos/:encodedPath', async (req, res) => {
 // Global watcher instance
 let diagramWatcher = null;
 
+// WebSocket server instance
+let wss = null;
+
+// Broadcast message to all connected WebSocket clients
+function broadcast(message) {
+  if (!wss) return;
+  wss.clients.forEach(client => {
+    if (client.readyState === 1) { // WebSocket.OPEN = 1
+      client.send(JSON.stringify(message));
+    }
+  });
+}
+
 // Setup multi-repo file watcher
 async function setupWatcher() {
   try {
@@ -452,17 +466,20 @@ async function setupWatcher() {
     // Create and start watcher
     diagramWatcher = createWatcher(pathsToWatch);
 
-    // Log events for debugging
+    // Wire watcher events to broadcasts
     diagramWatcher.on('add', ({ filename, repo }) => {
-      console.log(`👁️  File added: ${filename} (${repo})`);
+      console.log(`📄 File added: ${filename} (${repo})`);
+      broadcast({ type: 'diagram.add', filename, repo });
     });
 
     diagramWatcher.on('change', ({ filename, repo }) => {
-      console.log(`👁️  File changed: ${filename} (${repo})`);
+      console.log(`📝 File changed: ${filename} (${repo})`);
+      broadcast({ type: 'diagram.change', filename, repo });
     });
 
     diagramWatcher.on('unlink', ({ filename, repo }) => {
-      console.log(`👁️  File removed: ${filename} (${repo})`);
+      console.log(`🗑️  File deleted: ${filename} (${repo})`);
+      broadcast({ type: 'diagram.unlink', filename, repo });
     });
 
     diagramWatcher.on('error', (error) => {
@@ -480,15 +497,24 @@ async function start() {
   await migrateOrphanedDiagrams();
   await setupWatcher();
 
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`
 ╔═══════════════════════════════════════════╗
 ║  ⚡ Aligner Server running on port ${PORT}   ║
 ║                                           ║
 ║  Diagrams: ${ALIGNER_DIR}
 ║  API: http://localhost:${PORT}              ║
+║  WebSocket: ws://localhost:${PORT}          ║
 ╚═══════════════════════════════════════════╝
 `);
+  });
+
+  // Setup WebSocket server
+  wss = new WebSocketServer({ server });
+  
+  wss.on('connection', (ws) => {
+    console.log('🔌 WebSocket client connected');
+    ws.on('close', () => console.log('🔌 WebSocket client disconnected'));
   });
 }
 

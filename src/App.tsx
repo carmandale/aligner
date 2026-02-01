@@ -147,6 +147,42 @@ function App() {
     }).catch(() => {})
   }, [file, setNodes, setEdges])
 
+  // WebSocket connection for real-time updates
+  useEffect(() => {
+    const ws = new WebSocket('ws://localhost:3001')
+
+    ws.onopen = () => {
+      console.log('🔌 Connected to server')
+    }
+
+    ws.onmessage = (event) => {
+      const msg = JSON.parse(event.data)
+      console.log('📨 Received:', msg)
+
+      if (msg.type.startsWith('diagram.')) {
+        // Refresh diagram list on any diagram change
+        loadDiagrams()
+      }
+    }
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error)
+    }
+
+    ws.onclose = () => {
+      console.log('🔌 Disconnected from server')
+      // Auto-reconnect after 3 seconds
+      setTimeout(() => {
+        console.log('🔄 Reconnecting...')
+        window.location.reload()
+      }, 3000)
+    }
+
+    return () => {
+      ws.close()
+    }
+  }, [loadDiagrams])
+
   // Save to server
   const saveDiagram = useCallback((updated: AlignerDiagram) => {
     if (!file) return
