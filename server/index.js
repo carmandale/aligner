@@ -30,6 +30,59 @@ async function ensureDir() {
   }
 }
 
+// Migrate orphaned diagrams from ~/.aligner/*.json to ~/.aligner/global/
+async function migrateOrphanedDiagrams() {
+  try {
+    // Get all files in ALIGNER_DIR
+    const files = await fs.readdir(ALIGNER_DIR);
+
+    // Find orphaned .json files (exclude registry.json*)
+    const orphanedFiles = files.filter(file =>
+      file.endsWith('.json') && !file.startsWith('registry.json')
+    );
+
+    if (orphanedFiles.length === 0) {
+      return; // Nothing to migrate
+    }
+
+    // Create global/ directory if needed
+    const globalDir = path.join(ALIGNER_DIR, 'global');
+    await fs.mkdir(globalDir, { recursive: true });
+
+    // Migrate each orphaned file
+    let migratedCount = 0;
+    for (const file of orphanedFiles) {
+      const sourcePath = path.join(ALIGNER_DIR, file);
+      const targetPath = path.join(globalDir, file);
+
+      // Check if target already exists (idempotency)
+      try {
+        await fs.access(targetPath);
+        console.log(`⏭️  Skipped (already migrated): ${file}`);
+        continue;
+      } catch {
+        // Target doesn't exist - proceed with migration
+      }
+
+      // Move file atomically
+      try {
+        await fs.rename(sourcePath, targetPath);
+        console.log(`📦 Migrated to global/: ${file}`);
+        migratedCount++;
+      } catch (err) {
+        console.error(`❌ Failed to migrate ${file}:`, err.message);
+      }
+    }
+
+    if (migratedCount > 0) {
+      console.log(`✅ Migration complete: ${migratedCount} diagram(s) moved to global/`);
+    }
+  } catch (err) {
+    console.error('Migration error:', err);
+    // Don't throw - allow server to start even if migration fails
+  }
+}
+
 // List all diagrams
 app.get('/diagrams', async (req, res) => {
   try {
@@ -312,6 +365,7 @@ function watchDirectory() {
 // Start server
 async function start() {
   await ensureDir();
+  await migrateOrphanedDiagrams();
   watchDirectory();
 
   app.listen(PORT, () => {
