@@ -17,7 +17,7 @@ export const AlignerNode = memo(function AlignerNode({
   data,
   selected,
 }: NodeProps) {
-  const nodeData = data as AlignerNodeData
+  const nodeData = data as unknown as AlignerNodeData
   const commentCount = nodeData.comments?.length || 0
   const hasComments = commentCount > 0
 

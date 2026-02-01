@@ -93,9 +93,56 @@ body {
   margin-bottom: 8px;
 }
 
+/* Repo Groups */
+.repo-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.repo-group {
+  margin-bottom: 8px;
+}
+
+.repo-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.repo-icon {
+  color: var(--color-aligner-500);
+  flex-shrink: 0;
+}
+
+.repo-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: #ddd;
+}
+
+.diagram-count {
+  font-size: 11px;
+  color: #666;
+}
+
+.chevron {
+  color: #666;
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+
 /* Diagram List */
 .diagram-list {
   list-style: none;
+  margin-left: 22px;
+  overflow: hidden;
 }
 
 .diagram-list li {

@@ -16,12 +16,15 @@ import {
   MarkerType,
 } from '@xyflow/react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  Plus, 
-  MessageCircle, 
-  Send, 
+import {
+  Plus,
+  MessageCircle,
+  Send,
   Workflow,
   Sparkles,
+  Folder,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react'
 import '@xyflow/react/dist/style.css'
 import './styles.css'
@@ -60,8 +63,32 @@ interface AlignerDiagram {
 
 const API = 'http://localhost:3001'
 
+interface DiagramListItem {
+  filename: string
+  name: string
+  repo: string
+  repoPath: string
+  modified?: string
+}
+
+interface GroupedDiagrams {
+  [repo: string]: DiagramListItem[]
+}
+
+// Helper function to group diagrams by repo
+function groupDiagramsByRepo(diagrams: DiagramListItem[]): GroupedDiagrams {
+  return diagrams.reduce((acc, diagram) => {
+    const repo = diagram.repo
+    if (!acc[repo]) {
+      acc[repo] = []
+    }
+    acc[repo].push(diagram)
+    return acc
+  }, {} as GroupedDiagrams)
+}
+
 function App() {
-  const [diagrams, setDiagrams] = useState<{ filename: string; name: string }[]>([])
+  const [diagrams, setDiagrams] = useState<DiagramListItem[]>([])
   const [file, setFile] = useState<string | null>(null)
   const [diagram, setDiagram] = useState<AlignerDiagram | null>(null)
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
@@ -70,6 +97,7 @@ function App() {
   const [newComment, setNewComment] = useState('')
   const [newNodeLabel, setNewNodeLabel] = useState('')
   const [showAddNode, setShowAddNode] = useState(false)
+  const [collapsedRepos, setCollapsedRepos] = useState<{ [repo: string]: boolean }>({})
 
   // Load list
   useEffect(() => {
@@ -219,6 +247,11 @@ function App() {
 
   const selectedNode = diagram?.nodes.find(n => n.id === selected)
   const allComments = diagram?.nodes.filter(n => n.comments?.length) || []
+  const groupedDiagrams = groupDiagramsByRepo(diagrams)
+
+  const toggleRepoCollapse = (repo: string) => {
+    setCollapsedRepos(prev => ({ ...prev, [repo]: !prev[repo] }))
+  }
 
   return (
     <div className="app">
@@ -238,20 +271,58 @@ function App() {
         <aside className="sidebar">
           <div>
             <h2>Diagrams</h2>
-            <ul className="diagram-list">
-              {diagrams.map(d => (
-                <motion.li 
-                  key={d.filename} 
-                  className={file === d.filename ? 'selected' : ''} 
-                  onClick={() => setFile(d.filename)}
-                  whileHover={{ x: 2 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <span className="name">{d.name}</span>
-                  <span className="filename">{d.filename}</span>
-                </motion.li>
-              ))}
-            </ul>
+            <div className="repo-groups">
+              {Object.entries(groupedDiagrams).map(([repo, repoDiagrams]) => {
+                const isCollapsed = collapsedRepos[repo] || false
+
+                return (
+                  <div key={repo} className="repo-group">
+                    <motion.div
+                      className="repo-header"
+                      onClick={() => toggleRepoCollapse(repo)}
+                      whileHover={{ backgroundColor: 'rgba(255,255,255,0.03)' }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <Folder size={14} className="repo-icon" />
+                      <span className="repo-name">{repo}</span>
+                      <span className="diagram-count">({repoDiagrams.length})</span>
+                      {isCollapsed ? (
+                        <ChevronRight size={14} className="chevron" />
+                      ) : (
+                        <ChevronDown size={14} className="chevron" />
+                      )}
+                    </motion.div>
+
+                    <AnimatePresence>
+                      {!isCollapsed && (
+                        <motion.ul
+                          className="diagram-list"
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          {repoDiagrams.map(d => (
+                            <motion.li
+                              key={d.filename}
+                              className={file === d.filename ? 'selected' : ''}
+                              onClick={() => setFile(d.filename)}
+                              whileHover={{ x: 2 }}
+                              whileTap={{ scale: 0.98 }}
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                            >
+                              <span className="name">{d.name}</span>
+                              <span className="filename">{d.filename}</span>
+                            </motion.li>
+                          ))}
+                        </motion.ul>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )
+              })}
+            </div>
           </div>
 
           <div>
