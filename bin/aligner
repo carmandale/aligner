@@ -22,6 +22,9 @@ Usage: aligner <command>
 
 Commands:
   init        Initialize current directory as an Aligner repo
+  register    Add current directory to registry (requires .aligner/)
+  unregister  Remove current directory from registry
+  repos       List all registered repositories
   start       Start Aligner server and viewer
   server      Start only the API server
   viewer      Start only the web viewer
@@ -34,11 +37,13 @@ Environment:
   PORT           Server port (default: 3001)
 
 Examples:
-  aligner init               # Initialize current directory
+  aligner init                      # Initialize current directory
   aligner init --name "My Project"  # With custom name
-  aligner start              # Start everything
-  aligner list               # Show available diagrams
-  aligner open               # Open in browser
+  aligner register                  # Add to registry
+  aligner repos                     # List all repos
+  aligner start                     # Start everything
+  aligner list                      # Show available diagrams
+  aligner open                      # Open in browser
 
 EOF
 }
@@ -67,15 +72,8 @@ stop_all() {
 }
 
 list_diagrams() {
-  ALIGNER_DIR="${ALIGNER_DIR:-$HOME/.aligner}"
-  echo -e "${BLUE}Diagrams in ${ALIGNER_DIR}:${NC}"
-  echo ""
-  for f in "$ALIGNER_DIR"/*.json; do
-    [ -f "$f" ] || continue
-    name=$(basename "$f")
-    title=$(grep -o '"name"[[:space:]]*:[[:space:]]*"[^"]*"' "$f" | head -1 | cut -d'"' -f4)
-    echo -e "  ${GREEN}•${NC} ${name} - ${title:-Untitled}"
-  done
+  # Delegate to Node.js module for consistency with other commands
+  node "$SCRIPT_DIR/aligner-list.js" "$@"
 }
 
 open_browser() {
@@ -91,6 +89,18 @@ case "${1:-}" in
   init)
     shift  # Remove 'init' from args
     exec node "$SCRIPT_DIR/aligner-init.js" "$@"
+    ;;
+  register)
+    shift  # Remove 'register' from args
+    exec node "$SCRIPT_DIR/aligner-register.js" "$@"
+    ;;
+  unregister)
+    shift  # Remove 'unregister' from args
+    exec node "$SCRIPT_DIR/aligner-unregister.js" "$@"
+    ;;
+  repos)
+    shift  # Remove 'repos' from args
+    exec node "$SCRIPT_DIR/aligner-repos.js" "$@"
     ;;
   start)
     trap stop_all EXIT
