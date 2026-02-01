@@ -21,6 +21,7 @@ usage() {
 Usage: aligner <command>
 
 Commands:
+  init        Initialize current directory as an Aligner repo
   start       Start Aligner server and viewer
   server      Start only the API server
   viewer      Start only the web viewer
@@ -33,6 +34,8 @@ Environment:
   PORT           Server port (default: 3001)
 
 Examples:
+  aligner init               # Initialize current directory
+  aligner init --name "My Project"  # With custom name
   aligner start              # Start everything
   aligner list               # Show available diagrams
   aligner open               # Open in browser
@@ -85,6 +88,10 @@ open_browser() {
 }
 
 case "${1:-}" in
+  init)
+    shift  # Remove 'init' from args
+    exec node "$SCRIPT_DIR/aligner-init.js" "$@"
+    ;;
   start)
     trap stop_all EXIT
     start_server
