@@ -83,6 +83,20 @@ async function migrateOrphanedDiagrams() {
   }
 }
 
+/**
+ * Resolve diagram path based on repo context
+ * @param {string} repo - Either 'global' or URL-encoded absolute path
+ * @param {string} filename - Diagram filename (must end with .json)
+ * @returns {string} Absolute path to the diagram file
+ */
+function resolveDiagramPath(repo, filename) {
+  if (repo === 'global') {
+    return path.join(ALIGNER_DIR, 'global', filename);
+  }
+  const decodedPath = decodeURIComponent(repo);
+  return path.join(decodedPath, '.aligner', filename);
+}
+
 // List all diagrams from all registered repos plus global
 app.get('/diagrams', async (req, res) => {
   try {
@@ -136,15 +150,15 @@ app.get('/diagrams', async (req, res) => {
   }
 });
 
-// Get a specific diagram
-app.get('/diagram/:filename', async (req, res) => {
+// Get a specific diagram (repo-aware)
+app.get('/diagram/:repo/:filename', async (req, res) => {
   try {
-    const filename = req.params.filename;
+    const { repo, filename } = req.params;
     if (!filename.endsWith('.json')) {
       return res.status(400).json({ error: 'Invalid filename' });
     }
 
-    const filepath = path.join(ALIGNER_DIR, filename);
+    const filepath = resolveDiagramPath(repo, filename);
     const content = await fs.readFile(filepath, 'utf-8');
     const data = JSON.parse(content);
     res.json(data);
@@ -157,10 +171,16 @@ app.get('/diagram/:filename', async (req, res) => {
   }
 });
 
-// Save/update a diagram
-app.put('/diagram/:filename', async (req, res) => {
+// Backward compatibility: redirect old routes to global
+app.get('/diagram/:filename', async (req, res) => {
+  const { filename } = req.params;
+  return res.redirect(307, `/diagram/global/${filename}`);
+});
+
+// Save/update a diagram (repo-aware)
+app.put('/diagram/:repo/:filename', async (req, res) => {
   try {
-    const filename = req.params.filename;
+    const { repo, filename } = req.params;
     if (!filename.endsWith('.json')) {
       return res.status(400).json({ error: 'Invalid filename' });
     }
@@ -169,10 +189,15 @@ app.put('/diagram/:filename', async (req, res) => {
     data.metadata = data.metadata || {};
     data.metadata.modified = new Date().toISOString();
 
-    const filepath = path.join(ALIGNER_DIR, filename);
+    const filepath = resolveDiagramPath(repo, filename);
+
+    // Ensure directory exists (needed for repo paths)
+    const dirPath = path.dirname(filepath);
+    await fs.mkdir(dirPath, { recursive: true });
+
     await fs.writeFile(filepath, JSON.stringify(data, null, 2));
-    
-    console.log(`💾 Saved: ${filename}`);
+
+    console.log(`💾 Saved: ${repo}/${filename}`);
     res.json(data);
   } catch (err) {
     console.error('Save error:', err);
@@ -180,12 +205,19 @@ app.put('/diagram/:filename', async (req, res) => {
   }
 });
 
-// Create a new diagram
-app.post('/diagram', async (req, res) => {
+// Backward compatibility: redirect old routes to global
+app.put('/diagram/:filename', async (req, res) => {
+  const { filename } = req.params;
+  return res.redirect(307, `/diagram/global/${filename}`);
+});
+
+// Create a new diagram (repo-aware)
+app.post('/diagram/:repo', async (req, res) => {
   try {
+    const { repo } = req.params;
     const { name, ...rest } = req.body;
     const filename = `${name.toLowerCase().replace(/\s+/g, '-')}.json`;
-    const filepath = path.join(ALIGNER_DIR, filename);
+    const filepath = resolveDiagramPath(repo, filename);
 
     // Check if exists
     try {
@@ -207,21 +239,30 @@ app.post('/diagram', async (req, res) => {
       ...rest,
     };
 
+    // Ensure directory exists (needed for repo paths)
+    const dirPath = path.dirname(filepath);
+    await fs.mkdir(dirPath, { recursive: true });
+
     await fs.writeFile(filepath, JSON.stringify(data, null, 2));
-    console.log(`✨ Created: ${filename}`);
+    console.log(`✨ Created: ${repo}/${filename}`);
     res.status(201).json({ filename, ...data });
   } catch (err) {
     res.status(500).json({ error: 'Failed to create diagram' });
   }
 });
 
-// Delete a diagram
-app.delete('/diagram/:filename', async (req, res) => {
+// Backward compatibility: redirect old routes to global
+app.post('/diagram', async (req, res) => {
+  return res.redirect(307, '/diagram/global');
+});
+
+// Delete a diagram (repo-aware)
+app.delete('/diagram/:repo/:filename', async (req, res) => {
   try {
-    const filename = req.params.filename;
-    const filepath = path.join(ALIGNER_DIR, filename);
+    const { repo, filename } = req.params;
+    const filepath = resolveDiagramPath(repo, filename);
     await fs.unlink(filepath);
-    console.log(`🗑️  Deleted: ${filename}`);
+    console.log(`🗑️  Deleted: ${repo}/${filename}`);
     res.json({ success: true });
   } catch (err) {
     if (err.code === 'ENOENT') {
@@ -230,6 +271,12 @@ app.delete('/diagram/:filename', async (req, res) => {
       res.status(500).json({ error: 'Failed to delete diagram' });
     }
   }
+});
+
+// Backward compatibility: redirect old routes to global
+app.delete('/diagram/:filename', async (req, res) => {
+  const { filename } = req.params;
+  return res.redirect(307, `/diagram/global/${filename}`);
 });
 
 // ========================================
