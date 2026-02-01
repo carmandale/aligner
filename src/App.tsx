@@ -29,6 +29,7 @@ import {
 import '@xyflow/react/dist/style.css'
 import './styles.css'
 import { nodeTypes } from './components/AlignerNode'
+import { CreateDiagramModal } from './components/CreateDiagramModal'
 
 interface Comment {
   from: 'user' | 'agent'
@@ -98,13 +99,18 @@ function App() {
   const [newNodeLabel, setNewNodeLabel] = useState('')
   const [showAddNode, setShowAddNode] = useState(false)
   const [collapsedRepos, setCollapsedRepos] = useState<{ [repo: string]: boolean }>({})
+  const [showCreateModal, setShowCreateModal] = useState(false)
 
   // Load list
-  useEffect(() => {
+  const loadDiagrams = useCallback(() => {
     fetch(`${API}/diagrams`).then(r => r.json()).then(d => {
       setDiagrams(d)
       if (d.length && !file) setFile(d[0].filename)
     }).catch(() => {})
+  }, [file])
+
+  useEffect(() => {
+    loadDiagrams()
   }, [])
 
   // Load diagram
@@ -270,7 +276,19 @@ function App() {
       <div className="main">
         <aside className="sidebar">
           <div>
-            <h2>Diagrams</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h2>Diagrams</h2>
+              <motion.button
+                className="new-diagram-btn"
+                onClick={() => setShowCreateModal(true)}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                style={{ width: 'auto', padding: '6px 12px', fontSize: '12px' }}
+              >
+                <Plus size={14} />
+                New
+              </motion.button>
+            </div>
             <div className="repo-groups">
               {Object.entries(groupedDiagrams).map(([repo, repoDiagrams]) => {
                 const isCollapsed = collapsedRepos[repo] || false
@@ -460,6 +478,14 @@ function App() {
           )}
         </main>
       </div>
+
+      <CreateDiagramModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={() => {
+          loadDiagrams()
+        }}
+      />
     </div>
   )
 }
