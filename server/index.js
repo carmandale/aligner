@@ -83,30 +83,55 @@ async function migrateOrphanedDiagrams() {
   }
 }
 
-// List all diagrams
+// List all diagrams from all registered repos plus global
 app.get('/diagrams', async (req, res) => {
   try {
-    const files = await fs.readdir(ALIGNER_DIR);
+    const registry = await loadRegistry();
     const diagrams = [];
 
-    for (const file of files) {
-      if (!file.endsWith('.json')) continue;
-      
+    // Helper function to scan a directory for diagrams
+    async function scanDirectory(dirPath, repoName, repoPath) {
       try {
-        const content = await fs.readFile(path.join(ALIGNER_DIR, file), 'utf-8');
-        const data = JSON.parse(content);
-        diagrams.push({
-          filename: file,
-          name: data.name || file.replace('.json', ''),
-          modified: data.metadata?.modified || data.metadata?.created,
-        });
-      } catch {
-        // Skip invalid files
+        const files = await fs.readdir(dirPath);
+
+        for (const file of files) {
+          if (!file.endsWith('.json')) continue;
+
+          try {
+            const content = await fs.readFile(path.join(dirPath, file), 'utf-8');
+            const data = JSON.parse(content);
+            diagrams.push({
+              filename: file,
+              name: data.name || file.replace('.json', ''),
+              modified: data.metadata?.modified || data.metadata?.created,
+              repo: repoName,
+              repoPath: repoPath,
+            });
+          } catch {
+            // Skip invalid files
+          }
+        }
+      } catch (err) {
+        // Directory doesn't exist or is inaccessible - skip gracefully
+        if (err.code !== 'ENOENT') {
+          console.warn(`Warning: Failed to scan ${dirPath}:`, err.message);
+        }
       }
     }
 
+    // Scan all registered repos
+    for (const repo of registry.repos) {
+      const alignerDir = getAlignerDir(repo.path);
+      await scanDirectory(alignerDir, repo.name, repo.path);
+    }
+
+    // Always include global directory
+    const globalDir = getAlignerDir('global');
+    await scanDirectory(globalDir, 'Global', 'global');
+
     res.json(diagrams);
   } catch (err) {
+    console.error('Failed to list diagrams:', err);
     res.status(500).json({ error: 'Failed to list diagrams' });
   }
 });
