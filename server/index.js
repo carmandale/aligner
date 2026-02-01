@@ -11,6 +11,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { watch } from 'fs';
 import { homedir } from 'os';
+import { loadRegistry, saveRegistry, registerRepo, unregisterRepo, getAlignerDir } from './registry.js';
 
 const PORT = process.env.PORT || 3001;
 const ALIGNER_DIR = process.env.ALIGNER_DIR || path.join(homedir(), '.aligner');
@@ -153,6 +154,147 @@ app.delete('/diagram/:filename', async (req, res) => {
   }
 });
 
+// ========================================
+// Registry API Endpoints
+// ========================================
+
+/**
+ * GET /repos - List all registered repositories with status
+ * Returns repos split into "ok" and "missing" based on filesystem check
+ */
+app.get('/repos', async (req, res) => {
+  try {
+    const registry = await loadRegistry();
+    const repos = [];
+    const missing = [];
+
+    for (const repo of registry.repos) {
+      try {
+        // Check if repo path exists
+        await fs.access(repo.path);
+        // Check if .aligner directory exists
+        const alignerDir = getAlignerDir(repo.path);
+        await fs.access(alignerDir);
+        repos.push({ ...repo, status: 'ok' });
+      } catch {
+        missing.push({ ...repo, status: 'missing' });
+      }
+    }
+
+    res.json({ repos, missing });
+  } catch (err) {
+    console.error('GET /repos error:', err);
+    res.status(500).json({ error: 'Failed to list repositories' });
+  }
+});
+
+/**
+ * POST /repos/register - Register a new repository
+ * Body: { path: string, name?: string }
+ * Validates: path exists, .aligner/ directory exists
+ * Idempotent: returns existing repo if already registered
+ */
+app.post('/repos/register', async (req, res) => {
+  try {
+    const { path: repoPath, name } = req.body;
+
+    if (!repoPath) {
+      return res.status(400).json({ error: 'Path is required' });
+    }
+
+    // Validate path exists
+    try {
+      await fs.access(repoPath);
+    } catch {
+      return res.status(400).json({ error: 'Path does not exist' });
+    }
+
+    // Validate .aligner directory exists
+    const alignerDir = getAlignerDir(repoPath);
+    try {
+      await fs.access(alignerDir);
+    } catch {
+      return res.status(400).json({ error: 'No .aligner/ directory found' });
+    }
+
+    // Register (idempotent)
+    const repo = await registerRepo(repoPath, name);
+
+    // Return updated list
+    const registry = await loadRegistry();
+    res.json({ success: true, repo, repos: registry.repos });
+  } catch (err) {
+    console.error('POST /repos/register error:', err);
+    res.status(500).json({ error: 'Failed to register repository' });
+  }
+});
+
+/**
+ * DELETE /repos/:encodedPath - Unregister a repository
+ * Path param is URL-encoded repository path
+ * Returns 404 if repo not found in registry
+ */
+app.delete('/repos/:encodedPath', async (req, res) => {
+  try {
+    const repoPath = decodeURIComponent(req.params.encodedPath);
+
+    // Check if repo exists in registry
+    const registry = await loadRegistry();
+    const exists = registry.repos.some(r => r.path === repoPath);
+
+    if (!exists) {
+      return res.status(404).json({ error: 'Repo not found' });
+    }
+
+    // Unregister
+    await unregisterRepo(repoPath);
+
+    // Return updated list
+    const updated = await loadRegistry();
+    res.json({ success: true, repos: updated.repos });
+  } catch (err) {
+    console.error('DELETE /repos/:encodedPath error:', err);
+    res.status(500).json({ error: 'Failed to unregister repository' });
+  }
+});
+
+/**
+ * PATCH /repos/:encodedPath - Update repository name
+ * Path param is URL-encoded repository path
+ * Body: { name: string }
+ * Returns 404 if repo not found
+ */
+app.patch('/repos/:encodedPath', async (req, res) => {
+  try {
+    const repoPath = decodeURIComponent(req.params.encodedPath);
+    const { name } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+
+    // Load registry
+    const registry = await loadRegistry();
+
+    // Find repo
+    const repo = registry.repos.find(r => r.path === repoPath);
+    if (!repo) {
+      return res.status(404).json({ error: 'Repo not found' });
+    }
+
+    // Update name
+    repo.name = name;
+
+    // Save registry
+    await saveRegistry(registry);
+
+    res.json({ success: true, repo });
+  } catch (err) {
+    console.error('PATCH /repos/:encodedPath error:', err);
+    res.status(500).json({ error: 'Failed to update repository' });
+  }
+});
+
 // Watch for file changes and log
 function watchDirectory() {
   try {
@@ -171,7 +313,7 @@ function watchDirectory() {
 async function start() {
   await ensureDir();
   watchDirectory();
-  
+
   app.listen(PORT, () => {
     console.log(`
 ╔═══════════════════════════════════════════╗
@@ -184,4 +326,12 @@ async function start() {
   });
 }
 
-start();
+// Only start server if this is the main module
+// Use pathToFileURL to handle spaces and special characters correctly
+import { pathToFileURL } from 'url';
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  start();
+}
+
+// Export app for testing
+export default app;
