@@ -93,6 +93,25 @@ body {
   margin-bottom: 8px;
 }
 
+.filter-box {
+  margin-bottom: 10px;
+}
+
+.filter-box input {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--color-shell-950);
+  border: 1px solid var(--color-shell-600);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 12px;
+}
+
+.filter-box input:focus {
+  outline: none;
+  border-color: var(--color-aligner-500);
+}
+
 /* Repo Groups */
 .repo-groups {
   display: flex;
@@ -115,6 +134,10 @@ body {
   user-select: none;
 }
 
+.repo-header.missing {
+  opacity: 0.7;
+}
+
 .repo-icon {
   color: var(--color-aligner-500);
   flex-shrink: 0;
@@ -130,6 +153,24 @@ body {
 .diagram-count {
   font-size: 11px;
   color: #666;
+}
+
+.repo-status {
+  font-size: 10px;
+  color: #f59e0b;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.repo-missing-actions {
+  display: flex;
+  gap: 6px;
+  margin: 4px 10px 8px 26px;
+}
+
+.repo-missing-actions .btn-secondary {
+  padding: 4px 8px;
+  font-size: 11px;
 }
 
 .chevron {
