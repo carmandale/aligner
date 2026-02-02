@@ -33,6 +33,7 @@ cd server && npm install && cd ..
 # Start API server + viewer (single command)
 npm start
 # or: ./bin/aligner start
+# This also installs the "aligner" command if a writable PATH dir is available.
 
 # Open browser
 open http://127.0.0.1:5173
@@ -89,7 +90,7 @@ ALIGNER_VIEWER_PORT=5174 \
 
 Aligner can manage diagrams across multiple repositories from a single UI. Each repo gets its own `.aligner/` directory, and diagrams are grouped by repository in the UI.
 
-Note: The commands below assume `aligner` is on your PATH. From this repo, use `./bin/aligner` instead.
+Note: The commands below assume `aligner` is on your PATH. Running `npm start` once will install it; otherwise use `./bin/aligner`.
 
 ### Setup
 
@@ -236,12 +237,9 @@ From this repo, run:
 - `./bin/aligner <command>` (recommended for development)
 - `npm start` (equivalent to `./bin/aligner start`)
 
-If you want `aligner` on your PATH for use in other repos:
+Running `npm start` (or `./bin/aligner start`) installs the `aligner` command into the first writable directory on your PATH (for example `~/.local/bin` or `/opt/homebrew/bin`). After that, you can run `aligner init --name "My Repo"` in any repo.
 
-```bash
-# From the aligner repo
-npm link
-```
+If no writable PATH dir is available, use `./bin/aligner` directly or add one to PATH and re-run.
 
 Commands shown as `aligner <cmd>` below assume it is on your PATH.
 

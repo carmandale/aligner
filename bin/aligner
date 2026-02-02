@@ -58,6 +58,41 @@ Examples:
 EOF2
 }
 
+ensure_global_command() {
+  if command -v aligner >/dev/null 2>&1; then
+    return
+  fi
+
+  local script_path="$SCRIPT_DIR/aligner"
+  local target_dir=""
+  local candidate
+
+  for candidate in "$HOME/.local/bin" "$HOME/bin" "/opt/homebrew/bin" "/usr/local/bin"; do
+    if [[ ":$PATH:" == *":$candidate:"* ]] && [ -d "$candidate" ] && [ -w "$candidate" ]; then
+      target_dir="$candidate"
+      break
+    fi
+  done
+
+  if [ -z "$target_dir" ]; then
+    IFS=':' read -r -a path_dirs <<< "$PATH"
+    for candidate in "${path_dirs[@]}"; do
+      if [ -d "$candidate" ] && [ -w "$candidate" ]; then
+        target_dir="$candidate"
+        break
+      fi
+    done
+  fi
+
+  if [ -z "$target_dir" ]; then
+    return
+  fi
+
+  if [ ! -e "$target_dir/aligner" ]; then
+    ln -s "$script_path" "$target_dir/aligner" 2>/dev/null || true
+  fi
+}
+
 start_server() {
   echo -e "${BLUE}Starting Aligner server...${NC}"
   cd "$ROOT_DIR/server"
@@ -97,6 +132,8 @@ open_browser() {
     xdg-open "$VIEWER_URL"
   fi
 }
+
+ensure_global_command
 
 case "${1:-}" in
   init)
