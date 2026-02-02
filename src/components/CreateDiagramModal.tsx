@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, FileText, Folder } from 'lucide-react'
+import { ALIGNER_API_URL } from '../config'
 
 interface Repo {
   path: string
@@ -15,7 +16,7 @@ interface CreateDiagramModalProps {
   preSelectedRepo?: string
 }
 
-const API = 'http://localhost:3001'
+const API = ALIGNER_API_URL
 
 export function CreateDiagramModal({
   isOpen,
@@ -43,13 +44,14 @@ export function CreateDiagramModal({
           setRepos(allRepos)
 
           // Pre-select repo if provided
-          if (preSelectedRepo) {
-            setSelectedRepo(preSelectedRepo)
-          }
+          const preferred = preSelectedRepo || 'global'
+          const hasPreferred = allRepos.some(repo => repo.path === preferred)
+          setSelectedRepo(hasPreferred ? preferred : 'global')
         })
         .catch(() => {
           // Fallback to just Global if API fails
           setRepos([{ path: 'global', name: 'Global', status: 'ok' }])
+          setSelectedRepo('global')
         })
     }
   }, [isOpen, preSelectedRepo])

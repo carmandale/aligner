@@ -1,7 +1,17 @@
 #!/bin/bash
 
 # End-to-End Workflow Test for Aligner Multi-Repo Feature
-# Tests all major features in sequence
+#
+# Prereqs:
+# - Start the API server separately (default http://127.0.0.1:3001)
+#     cd server && PORT=3001 node index.js
+#   or:
+#     PORT=3001 ./bin/aligner server
+# - Tools: curl, jq, node
+#
+# Notes:
+# - The Aligner CLI commands init/register/unregister operate on the current working directory.
+# - ALIGNER_BIN is hard-coded below; change it to your local checkout if needed.
 
 set -e  # Exit on error
 
@@ -9,7 +19,7 @@ echo "🧪 Starting E2E Workflow Test"
 echo "=============================="
 echo ""
 
-BASE_URL="http://localhost:3001"
+BASE_URL="${BASE_URL:-http://127.0.0.1:${PORT:-3001}}"
 TEST_DIR="/tmp/aligner-e2e-test-$$"
 ALIGNER_BIN="/Users/dalecarman/Groove Jones Dropbox/Dale Carman/Projects/dev/aligner/bin/aligner"
 
@@ -102,7 +112,8 @@ else
 fi
 
 # Test 7: CLI - Register repo
-info "Test 7: CLI register - Register test repo"
+info "Test 7: CLI register - Register test repo (uses current directory)"
+# (we already cd into $TEST_DIR above)
 if "$ALIGNER_BIN" register "$TEST_DIR" --name "E2E Test Repo" > /tmp/aligner-register.log 2>&1; then
   pass "Registered test repo via CLI"
 else
@@ -152,7 +163,8 @@ else
 fi
 
 # Test 12: CLI - Unregister test repo
-info "Test 12: CLI unregister - Remove test repo"
+info "Test 12: CLI unregister - Remove test repo (uses current directory)"
+# (we must be in the repo directory for unregister to target it)
 if "$ALIGNER_BIN" unregister "$TEST_DIR" > /dev/null 2>&1; then
   pass "Unregistered test repo via CLI"
 else

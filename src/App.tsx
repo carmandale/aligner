@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ReactFlow,
   Background,
@@ -29,6 +29,7 @@ import {
 import '@xyflow/react/dist/style.css'
 import './styles.css'
 import { nodeTypes } from './components/AlignerNode'
+import { ALIGNER_API_URL, ALIGNER_WS_URL } from './config'
 import { CreateDiagramModal } from './components/CreateDiagramModal'
 
 interface Comment {
@@ -62,7 +63,7 @@ interface AlignerDiagram {
   metadata?: { description?: string }
 }
 
-const API = 'http://localhost:3001'
+const API = ALIGNER_API_URL
 
 interface DiagramListItem {
   filename: string
@@ -72,25 +73,26 @@ interface DiagramListItem {
   modified?: string
 }
 
-interface GroupedDiagrams {
-  [repo: string]: DiagramListItem[]
+interface RepoInfo {
+  path: string
+  name: string
+  status: 'ok' | 'missing'
 }
 
-// Helper function to group diagrams by repo
-function groupDiagramsByRepo(diagrams: DiagramListItem[]): GroupedDiagrams {
-  return diagrams.reduce((acc, diagram) => {
-    const repo = diagram.repo
-    if (!acc[repo]) {
-      acc[repo] = []
-    }
-    acc[repo].push(diagram)
-    return acc
-  }, {} as GroupedDiagrams)
+interface RepoGroup extends RepoInfo {
+  diagrams: DiagramListItem[]
 }
+
+const encodeRepoPath = (repoPath: string) =>
+  repoPath === 'global' ? 'global' : encodeURIComponent(repoPath)
+
+const diagramKey = (diagram: DiagramListItem) =>
+  `${diagram.repoPath}::${diagram.filename}`
 
 function App() {
   const [diagrams, setDiagrams] = useState<DiagramListItem[]>([])
-  const [file, setFile] = useState<string | null>(null)
+  const [selectedKey, setSelectedKey] = useState<string | null>(null)
+  const [repos, setRepos] = useState<RepoInfo[]>([])
   const [diagram, setDiagram] = useState<AlignerDiagram | null>(null)
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
@@ -98,101 +100,199 @@ function App() {
   const [newComment, setNewComment] = useState('')
   const [newNodeLabel, setNewNodeLabel] = useState('')
   const [showAddNode, setShowAddNode] = useState(false)
-  const [collapsedRepos, setCollapsedRepos] = useState<{ [repo: string]: boolean }>({})
+  const [filter, setFilter] = useState('')
+  const [collapsedRepos, setCollapsedRepos] = useState<{ [repoPath: string]: boolean }>({})
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const selectedDiagramRef = useRef<DiagramListItem | null>(null)
 
-  // Load list
+  const selectedDiagram = diagrams.find(d => diagramKey(d) === selectedKey) || null
+  const selectedRepoPath = selectedDiagram?.repoPath || 'global'
+
+  const applyDiagramData = useCallback((d: AlignerDiagram) => {
+    setDiagram(d)
+    setNodes(d.nodes.map(n => ({
+      id: n.id,
+      type: 'aligner',
+      position: n.position,
+      data: {
+        label: n.label,
+        comments: n.comments || [],
+        style: {
+          backgroundColor: n.style?.fill || '#fff',
+          border: `2px solid ${n.style?.stroke || '#374151'}`,
+          borderRadius: n.style?.cornerRadius || 8,
+        },
+      },
+    })))
+    setEdges(d.edges.map(e => ({
+      id: e.id,
+      source: e.from,
+      target: e.to,
+      label: e.label,
+      animated: e.type === 'dashed',
+      style: {
+        stroke: '#6b7280',
+        strokeWidth: 2,
+      },
+      markerEnd: { type: MarkerType.ArrowClosed, color: '#6b7280' },
+    })))
+  }, [setNodes, setEdges])
+
+  const fetchDiagram = useCallback((diagramInfo: DiagramListItem) => {
+    const repoParam = encodeRepoPath(diagramInfo.repoPath)
+    fetch(`${API}/diagram/${repoParam}/${diagramInfo.filename}`)
+      .then(r => r.json())
+      .then((d: AlignerDiagram) => {
+        applyDiagramData(d)
+      })
+      .catch(() => {})
+  }, [applyDiagramData])
+
   const loadDiagrams = useCallback(() => {
-    fetch(`${API}/diagrams`).then(r => r.json()).then(d => {
-      setDiagrams(d)
-      if (d.length && !file) setFile(d[0].filename)
-    }).catch(() => {})
-  }, [file])
+    fetch(`${API}/diagrams`)
+      .then(r => r.json())
+      .then((d: DiagramListItem[]) => {
+        setDiagrams(d)
+        setSelectedKey(prev => {
+          if (prev && d.some(diagram => diagramKey(diagram) === prev)) {
+            return prev
+          }
+          return d.length ? diagramKey(d[0]) : null
+        })
+        if (d.length === 0) {
+          setDiagram(null)
+          setNodes([])
+          setEdges([])
+        }
+      })
+      .catch(() => {})
+  }, [setDiagram, setEdges, setNodes])
+
+  const loadRepos = useCallback(() => {
+    fetch(`${API}/repos`)
+      .then(r => r.json())
+      .then(data => {
+        const okRepos = (data.repos || []).map((repo: RepoInfo) => ({
+          ...repo,
+          status: 'ok',
+        }))
+        const missingRepos = (data.missing || []).map((repo: RepoInfo) => ({
+          ...repo,
+          status: 'missing',
+        }))
+        setRepos([...okRepos, ...missingRepos])
+      })
+      .catch(() => {
+        setRepos([])
+      })
+  }, [])
 
   useEffect(() => {
     loadDiagrams()
-  }, [])
+    loadRepos()
+  }, [loadDiagrams, loadRepos])
 
-  // Load diagram
   useEffect(() => {
-    if (!file) return
-    fetch(`${API}/diagram/${file}`).then(r => r.json()).then((d: AlignerDiagram) => {
-      setDiagram(d)
-      setNodes(d.nodes.map(n => ({
-        id: n.id,
-        type: 'aligner',
-        position: n.position,
-        data: {
-          label: n.label,
-          comments: n.comments || [],
-          style: {
-            backgroundColor: n.style?.fill || '#fff',
-            border: `2px solid ${n.style?.stroke || '#374151'}`,
-            borderRadius: n.style?.cornerRadius || 8,
-          },
-        },
-      })))
-      setEdges(d.edges.map(e => ({
-        id: e.id,
-        source: e.from,
-        target: e.to,
-        label: e.label,
-        animated: e.type === 'dashed',
-        style: { 
-          stroke: '#6b7280',
-          strokeWidth: 2,
-        },
-        markerEnd: { type: MarkerType.ArrowClosed, color: '#6b7280' },
-      })))
-    }).catch(() => {})
-  }, [file, setNodes, setEdges])
+    selectedDiagramRef.current = selectedDiagram
+  }, [selectedDiagram])
+
+  useEffect(() => {
+    if (!selectedDiagram) return
+    fetchDiagram(selectedDiagram)
+  }, [selectedDiagram, fetchDiagram])
+
+  useEffect(() => {
+    setCollapsedRepos(prev => {
+      const next = { ...prev }
+      for (const repo of repos) {
+        if (next[repo.path] === undefined) {
+          next[repo.path] = true
+        }
+      }
+      if (next['global'] === undefined) {
+        next['global'] = false
+      }
+      return next
+    })
+  }, [repos])
 
   // WebSocket connection for real-time updates
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:3001')
+    let ws: WebSocket | null = null
+    let reconnectTimer: number | null = null
+    let didUnmount = false
 
-    ws.onopen = () => {
-      console.log('🔌 Connected to server')
-    }
+    const connect = () => {
+      ws = new WebSocket(ALIGNER_WS_URL)
 
-    ws.onmessage = (event) => {
-      const msg = JSON.parse(event.data)
-      console.log('📨 Received:', msg)
+      ws.onopen = () => {
+        console.log('🔌 Connected to server')
+      }
 
-      if (msg.type.startsWith('diagram.')) {
-        // Refresh diagram list on any diagram change
-        loadDiagrams()
+      ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data)
+        console.log('📨 Received:', msg)
+
+        if (msg.type.startsWith('diagram.')) {
+          // Refresh diagram list on any diagram change
+          loadDiagrams()
+
+          const current = selectedDiagramRef.current
+          if (current && msg.filename === current.filename) {
+            const repoName = current.repoPath === 'global'
+              ? 'global'
+              : current.repoPath.split('/').pop()
+            const msgRepo = typeof msg.repo === 'string' ? msg.repo.toLowerCase() : ''
+            const currentRepoLabel = current.repo ? current.repo.toLowerCase() : ''
+
+            if (
+              (repoName && msgRepo === repoName.toLowerCase()) ||
+              (currentRepoLabel && msgRepo === currentRepoLabel)
+            ) {
+              fetchDiagram(current)
+            }
+          }
+        }
+      }
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error)
+      }
+
+      ws.onclose = () => {
+        if (didUnmount) return
+        console.log('🔌 Disconnected from server')
+        reconnectTimer = window.setTimeout(() => {
+          console.log('🔄 Reconnecting...')
+          connect()
+        }, 3000)
       }
     }
 
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error)
-    }
-
-    ws.onclose = () => {
-      console.log('🔌 Disconnected from server')
-      // Auto-reconnect after 3 seconds
-      setTimeout(() => {
-        console.log('🔄 Reconnecting...')
-        window.location.reload()
-      }, 3000)
-    }
+    connect()
 
     return () => {
-      ws.close()
+      didUnmount = true
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer)
+      }
+      if (ws) {
+        ws.close()
+      }
     }
-  }, [loadDiagrams])
+  }, [fetchDiagram, loadDiagrams])
 
   // Save to server
   const saveDiagram = useCallback((updated: AlignerDiagram) => {
-    if (!file) return
+    if (!selectedDiagram) return
     setDiagram(updated)
-    fetch(`${API}/diagram/${file}`, {
+    const repoParam = encodeRepoPath(selectedDiagram.repoPath)
+    fetch(`${API}/diagram/${repoParam}/${selectedDiagram.filename}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updated),
     })
-  }, [file])
+  }, [selectedDiagram])
 
   // Save positions on drag
   const handleNodesChange: OnNodesChange<Node> = useCallback((changes) => {
@@ -243,7 +343,7 @@ function App() {
 
   // Add comment
   const addComment = () => {
-    if (!diagram || !file || !selected || !newComment.trim()) return
+    if (!diagram || !selected || !newComment.trim()) return
     const updated = { ...diagram, nodes: diagram.nodes.map(n => 
       n.id === selected ? { ...n, comments: [...(n.comments || []), { from: 'user' as const, text: newComment }] } : n
     )}
@@ -289,11 +389,86 @@ function App() {
 
   const selectedNode = diagram?.nodes.find(n => n.id === selected)
   const allComments = diagram?.nodes.filter(n => n.comments?.length) || []
-  const groupedDiagrams = groupDiagramsByRepo(diagrams)
+  const filterValue = filter.trim().toLowerCase()
 
-  const toggleRepoCollapse = (repo: string) => {
-    setCollapsedRepos(prev => ({ ...prev, [repo]: !prev[repo] }))
+  const diagramsByRepo = diagrams.reduce((acc, d) => {
+    if (!acc[d.repoPath]) {
+      acc[d.repoPath] = []
+    }
+    acc[d.repoPath].push(d)
+    return acc
+  }, {} as Record<string, DiagramListItem[]>)
+
+  const repoIndex = new Map(repos.map(repo => [repo.path, repo]))
+  const repoGroups: RepoGroup[] = repos.map(repo => ({
+    ...repo,
+    diagrams: diagramsByRepo[repo.path] || [],
+  }))
+
+  for (const [repoPath, repoDiagrams] of Object.entries(diagramsByRepo)) {
+    if (repoPath === 'global') continue
+    if (repoIndex.has(repoPath)) continue
+    repoGroups.push({
+      path: repoPath,
+      name: repoDiagrams[0]?.repo || repoPath.split('/').pop() || repoPath,
+      status: 'missing',
+      diagrams: repoDiagrams,
+    })
   }
+
+  const globalGroup: RepoGroup = {
+    path: 'global',
+    name: 'Global',
+    status: 'ok',
+    diagrams: diagramsByRepo['global'] || [],
+  }
+
+  const orderedGroups = [
+    ...repoGroups.filter(repo => repo.path !== 'global' && repo.status === 'ok')
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    ...repoGroups.filter(repo => repo.path !== 'global' && repo.status === 'missing')
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    globalGroup,
+  ]
+
+  const toggleRepoCollapse = (repoPath: string) => {
+    setCollapsedRepos(prev => ({ ...prev, [repoPath]: !prev[repoPath] }))
+  }
+
+  const handleRemoveRepo = useCallback(async (repo: RepoGroup) => {
+    if (!window.confirm(`Remove "${repo.name}" from the registry?`)) return
+    try {
+      await fetch(`${API}/repos/${encodeURIComponent(repo.path)}`, { method: 'DELETE' })
+      loadRepos()
+      loadDiagrams()
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Failed to remove repository')
+    }
+  }, [loadDiagrams, loadRepos])
+
+  const handleLocateRepo = useCallback(async (repo: RepoGroup) => {
+    const newPath = window.prompt(`Enter the new path for "${repo.name}"`, repo.path)
+    if (!newPath) return
+
+    try {
+      const response = await fetch(`${API}/repos/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: newPath, name: repo.name }),
+      })
+
+      if (!response.ok) {
+        const errData = await response.json()
+        throw new Error(errData.error || 'Failed to register repository')
+      }
+
+      await fetch(`${API}/repos/${encodeURIComponent(repo.path)}`, { method: 'DELETE' })
+      loadRepos()
+      loadDiagrams()
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Failed to update repository')
+    }
+  }, [loadDiagrams, loadRepos])
 
   return (
     <div className="app">
@@ -325,21 +500,55 @@ function App() {
                 New
               </motion.button>
             </div>
+            <div className="filter-box">
+              <input
+                type="text"
+                value={filter}
+                onChange={e => setFilter(e.target.value)}
+                placeholder="Filter diagrams or repos..."
+              />
+            </div>
             <div className="repo-groups">
-              {Object.entries(groupedDiagrams).map(([repo, repoDiagrams]) => {
-                const isCollapsed = collapsedRepos[repo] || false
+              {orderedGroups.map(group => {
+                const repoMatches = filterValue.length > 0
+                  ? group.name.toLowerCase().includes(filterValue)
+                  : false
+                const diagramMatches = filterValue.length > 0
+                  ? group.diagrams.filter(d => (
+                    d.name.toLowerCase().includes(filterValue) ||
+                    d.filename.toLowerCase().includes(filterValue)
+                  ))
+                  : group.diagrams
+                const diagramsToShow = filterValue.length > 0 && !repoMatches
+                  ? diagramMatches
+                  : group.diagrams
+                const shouldShow = filterValue.length > 0
+                  ? (repoMatches || diagramMatches.length > 0)
+                  : (group.diagrams.length > 0 || group.status === 'missing' || group.path === 'global')
+
+                if (!shouldShow) return null
+
+                const isCollapsed = filterValue.length > 0
+                  ? false
+                  : (collapsedRepos[group.path] ?? (group.path !== 'global'))
+                const diagramCount = filterValue.length > 0 && !repoMatches
+                  ? diagramMatches.length
+                  : group.diagrams.length
 
                 return (
-                  <div key={repo} className="repo-group">
+                  <div key={group.path} className="repo-group">
                     <motion.div
-                      className="repo-header"
-                      onClick={() => toggleRepoCollapse(repo)}
+                      className={`repo-header ${group.status === 'missing' ? 'missing' : ''}`}
+                      onClick={() => toggleRepoCollapse(group.path)}
                       whileHover={{ backgroundColor: 'rgba(255,255,255,0.03)' }}
                       whileTap={{ scale: 0.98 }}
                     >
                       <Folder size={14} className="repo-icon" />
-                      <span className="repo-name">{repo}</span>
-                      <span className="diagram-count">({repoDiagrams.length})</span>
+                      <span className="repo-name">{group.name}</span>
+                      {group.status === 'missing' && (
+                        <span className="repo-status">Missing</span>
+                      )}
+                      <span className="diagram-count">({diagramCount})</span>
                       {isCollapsed ? (
                         <ChevronRight size={14} className="chevron" />
                       ) : (
@@ -347,8 +556,27 @@ function App() {
                       )}
                     </motion.div>
 
+                    {group.status === 'missing' && (
+                      <div className="repo-missing-actions">
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          onClick={() => handleLocateRepo(group)}
+                        >
+                          Locate
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          onClick={() => handleRemoveRepo(group)}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    )}
+
                     <AnimatePresence>
-                      {!isCollapsed && (
+                      {!isCollapsed && diagramsToShow.length > 0 && (
                         <motion.ul
                           className="diagram-list"
                           initial={{ height: 0, opacity: 0 }}
@@ -356,11 +584,11 @@ function App() {
                           exit={{ height: 0, opacity: 0 }}
                           transition={{ duration: 0.2 }}
                         >
-                          {repoDiagrams.map(d => (
+                          {diagramsToShow.map(d => (
                             <motion.li
-                              key={d.filename}
-                              className={file === d.filename ? 'selected' : ''}
-                              onClick={() => setFile(d.filename)}
+                              key={diagramKey(d)}
+                              className={diagramKey(d) === selectedKey ? 'selected' : ''}
+                              onClick={() => setSelectedKey(diagramKey(d))}
                               whileHover={{ x: 2 }}
                               whileTap={{ scale: 0.98 }}
                               initial={{ opacity: 0, x: -10 }}
@@ -521,6 +749,7 @@ function App() {
         onSuccess={() => {
           loadDiagrams()
         }}
+        preSelectedRepo={selectedRepoPath}
       />
     </div>
   )

@@ -503,8 +503,8 @@ async function start() {
 ║  ⚡ Aligner Server running on port ${PORT}   ║
 ║                                           ║
 ║  Diagrams: ${ALIGNER_DIR}
-║  API: http://localhost:${PORT}              ║
-║  WebSocket: ws://localhost:${PORT}          ║
+║  API: http://127.0.0.1:              ║
+║  WebSocket: ws://127.0.0.1:          ║
 ╚═══════════════════════════════════════════╝
 `);
   });

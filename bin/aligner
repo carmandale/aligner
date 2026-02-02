@@ -14,8 +14,15 @@ YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
+SERVER_PORT="${PORT:-3001}"
+VIEWER_PORT="${ALIGNER_VIEWER_PORT:-5173}"
+VIEWER_HOST="127.0.0.1"
+VIEWER_URL="http://${VIEWER_HOST}:${VIEWER_PORT}"
+DEFAULT_API_URL="http://${VIEWER_HOST}:${SERVER_PORT}"
+DEFAULT_WS_URL="ws://${VIEWER_HOST}:${SERVER_PORT}"
+
 usage() {
-  cat <<EOF
+  cat <<EOF2
 ⚡ Aligner - Visual feedback loop for AI agents
 
 Usage: aligner <command>
@@ -33,8 +40,11 @@ Commands:
   help        Show this help
 
 Environment:
-  ALIGNER_DIR    Diagram directory (default: ~/.aligner)
-  PORT           Server port (default: 3001)
+  ALIGNER_DIR           Diagram directory (default: ~/.aligner)
+  PORT                  Server port (default: 3001)
+  ALIGNER_VIEWER_PORT   Viewer port (default: 5173)
+  VITE_ALIGNER_API_URL  Frontend API base (default: http://127.0.0.1:3001)
+  VITE_ALIGNER_WS_URL   Frontend WebSocket URL (default: ws://127.0.0.1:3001)
 
 Examples:
   aligner init                      # Initialize current directory
@@ -45,13 +55,13 @@ Examples:
   aligner list                      # Show available diagrams
   aligner open                      # Open in browser
 
-EOF
+EOF2
 }
 
 start_server() {
   echo -e "${BLUE}Starting Aligner server...${NC}"
   cd "$ROOT_DIR/server"
-  node index.js &
+  PORT="$SERVER_PORT" node index.js &
   SERVER_PID=$!
   echo $SERVER_PID > /tmp/aligner-server.pid
 }
@@ -59,7 +69,10 @@ start_server() {
 start_viewer() {
   echo -e "${BLUE}Starting Aligner viewer...${NC}"
   cd "$ROOT_DIR"
-  npm run dev &
+  : "${VITE_ALIGNER_API_URL:=$DEFAULT_API_URL}"
+  : "${VITE_ALIGNER_WS_URL:=$DEFAULT_WS_URL}"
+  export VITE_ALIGNER_API_URL VITE_ALIGNER_WS_URL
+  npm run dev -- --host "$VIEWER_HOST" --port "$VIEWER_PORT" --strictPort &
   VIEWER_PID=$!
   echo $VIEWER_PID > /tmp/aligner-viewer.pid
 }
@@ -79,9 +92,9 @@ list_diagrams() {
 open_browser() {
   sleep 2
   if command -v open &>/dev/null; then
-    open "http://localhost:5173"
+    open "$VIEWER_URL"
   elif command -v xdg-open &>/dev/null; then
-    xdg-open "http://localhost:5173"
+    xdg-open "$VIEWER_URL"
   fi
 }
 
@@ -109,19 +122,22 @@ case "${1:-}" in
     start_viewer
     open_browser
     echo -e "${GREEN}✓ Aligner running${NC}"
-    echo -e "  Server: http://localhost:3001"
-    echo -e "  Viewer: http://localhost:5173"
+    echo -e "  Server: $DEFAULT_API_URL"
+    echo -e "  Viewer: $VIEWER_URL"
     echo ""
     echo "Press Ctrl+C to stop"
     wait
     ;;
   server)
     cd "$ROOT_DIR/server"
-    exec node index.js
+    PORT="$SERVER_PORT" exec node index.js
     ;;
   viewer)
     cd "$ROOT_DIR"
-    exec npm run dev
+    : "${VITE_ALIGNER_API_URL:=$DEFAULT_API_URL}"
+    : "${VITE_ALIGNER_WS_URL:=$DEFAULT_WS_URL}"
+    export VITE_ALIGNER_API_URL VITE_ALIGNER_WS_URL
+    exec npm run dev -- --host "$VIEWER_HOST" --port "$VIEWER_PORT" --strictPort
     ;;
   list)
     list_diagrams

@@ -8,8 +8,8 @@ Visual feedback loop for AI agents. You describe what you want, the AI generates
 
 ```
 ┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
-│   AI Agent      │────────▶│  ~/.aligner/    │────────▶│   Browser UI    │
-│  generates JSON │         │  diagram.json   │         │  renders flow   │
+│   AI Agent      │────────▶│ ~/.aligner/     │────────▶│   Browser UI    │
+│  generates JSON │         │  global/*.json  │         │  renders flow   │
 └─────────────────┘         └─────────────────┘         └─────────────────┘
          ▲                                                       │
          │                                                       │
@@ -30,18 +30,51 @@ cd aligner
 npm install
 cd server && npm install && cd ..
 
-# Initialize multi-repo registry
-npm run aligner init
-
-# Start (two terminals)
-# Terminal 1: API server
-cd server && node index.js
-
-# Terminal 2: Web UI
-npm run dev
+# Start API server + viewer (single command)
+npm start
+# or: ./bin/aligner start
 
 # Open browser
-open http://localhost:5173
+open http://127.0.0.1:5173
+```
+
+### Track this repo (optional)
+
+```bash
+./bin/aligner init
+```
+
+## Configuration
+
+Aligner defaults to 127.0.0.1 (not localhost) to avoid IPv6 ambiguity.
+
+### Ports
+
+- Server port: `PORT` (default `3001`)
+- Viewer port: `ALIGNER_VIEWER_PORT` (default `5173`)
+
+The viewer is started with `--strictPort`, so if `5173` is taken Vite will fail instead of choosing another port.
+
+### Frontend API/WS URLs
+
+The viewer reads these Vite env vars:
+
+- `VITE_ALIGNER_API_URL` (default `http://127.0.0.1:3001`)
+- `VITE_ALIGNER_WS_URL` (default derived from the API URL: `ws://...` or `wss://...`)
+
+When you start the viewer via `aligner start` or `aligner viewer`, `bin/aligner` will set `VITE_ALIGNER_API_URL` and `VITE_ALIGNER_WS_URL` automatically based on `PORT`, unless you explicitly override them. Trailing slashes are trimmed.
+
+Examples:
+
+```bash
+# Run everything on non-default ports
+PORT=4001 ALIGNER_VIEWER_PORT=5174 ./bin/aligner start
+
+# Viewer pointed at a custom server
+VITE_ALIGNER_API_URL="http://127.0.0.1:4001" \
+VITE_ALIGNER_WS_URL="ws://127.0.0.1:4001" \
+ALIGNER_VIEWER_PORT=5174 \
+./bin/aligner viewer
 ```
 
 ## Features
@@ -56,23 +89,26 @@ open http://localhost:5173
 
 Aligner can manage diagrams across multiple repositories from a single UI. Each repo gets its own `.aligner/` directory, and diagrams are grouped by repository in the UI.
 
+Note: The commands below assume `aligner` is on your PATH. From this repo, use `./bin/aligner` instead.
+
 ### Setup
 
 ```bash
-# Initialize the registry (creates ~/.aligner/registry.json)
-npm run aligner init
+# In each repo you want to track:
+cd /path/to/my-repo
+aligner init --name "My Repo"   # creates .aligner/ + registers it (idempotent)
 
-# Register a repository
-npm run aligner register /path/to/my-repo
+# If .aligner/ already exists:
+aligner register --name "My Repo"
 
-# List registered repos
-npm run aligner repos
+# Inspect registry
+aligner repos
 
-# List all diagrams across all repos
-npm run aligner list
+# List diagrams across all repos + global
+aligner list
 
-# Unregister a repo
-npm run aligner unregister /path/to/my-repo
+# Remove a repo from tracking (does not delete .aligner/)
+aligner unregister
 ```
 
 ### How It Works
@@ -83,6 +119,10 @@ npm run aligner unregister /path/to/my-repo
 - **File watcher**: Monitors all registered repos for diagram changes
 - **WebSocket**: Real-time updates push changes to all connected browsers
 - **UI grouping**: Diagrams grouped by repository with collapsible sections
+
+### Note on older diagram locations
+
+If you have older diagrams directly under `~/.aligner/` (for example `~/.aligner/foo.json`), the server will move them into `~/.aligner/global/` on startup.
 
 ## JSON Schema
 
@@ -158,7 +198,7 @@ Diagrams are stored as JSON files in either `~/.aligner/global/` or a repo's `.a
 
 ```bash
 # Check for user feedback
-cat ~/.aligner/my-diagram.json | jq '.nodes[] | select(.comments) | {label, comments}'
+cat ~/.aligner/global/my-diagram.json | jq '.nodes[] | select(.comments) | {label, comments}'
 ```
 
 ### Generating a Diagram
@@ -167,7 +207,7 @@ Prompt your AI:
 
 ```
 Create an Aligner diagram showing a user login flow.
-Save it to ~/.aligner/login-flow.json
+Save it to ~/.aligner/global/login-flow.json
 
 Use this format:
 - nodes: array with id, type, label, position, size, style
@@ -191,30 +231,78 @@ When you read a user comment, add your reply to the comments array:
 
 ## CLI Commands
 
-All commands are run via `npm run aligner <command>`:
+From this repo, run:
+
+- `./bin/aligner <command>` (recommended for development)
+- `npm start` (equivalent to `./bin/aligner start`)
+
+If you want `aligner` on your PATH for use in other repos:
+
+```bash
+# From the aligner repo
+npm link
+```
+
+Commands shown as `aligner <cmd>` below assume it is on your PATH.
 
 | Command | Description |
 |---------|-------------|
-| `init` | Initialize multi-repo registry (`~/.aligner/registry.json`) |
-| `register <path>` | Register a repository for diagram tracking |
-| `unregister <path>` | Remove a repository from tracking |
-| `repos` | List all registered repositories |
-| `list` | List all diagrams across all repos |
+| `aligner start` | Start API server + viewer (viewer uses `--strictPort`) |
+| `aligner server` | Start only the API server |
+| `aligner viewer` | Start only the web viewer |
+| `aligner open` | Open the viewer URL (`http://127.0.0.1:$ALIGNER_VIEWER_PORT`) |
+| `aligner init` | Create `.aligner/` in the current directory and register it |
+| `aligner register` | Register current directory (requires `.aligner/`) |
+| `aligner unregister` | Unregister current directory |
+| `aligner repos` | List registered repositories + status |
+| `aligner list` | List all diagrams (global + registered repos) |
+| `aligner help` | Show help |
+
+## Dev workflow
+
+If you want to run the API server and viewer separately, use two terminals:
+
+```bash
+# Terminal 1: API server
+cd server
+PORT=3001 node index.js
+
+# Terminal 2: Web UI
+cd ..
+VITE_ALIGNER_API_URL="http://127.0.0.1:3001" \
+VITE_ALIGNER_WS_URL="ws://127.0.0.1:3001" \
+npm run dev -- --host 127.0.0.1 --port 5173 --strictPort
+```
 
 ## API Endpoints
 
-The server runs on port 3001:
+The server runs on `PORT` (default `3001`):
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/diagrams` | List all diagrams (grouped by repo) |
-| `GET` | `/diagram/:repoId/:filename` | Get diagram JSON from specific repo |
-| `PUT` | `/diagram/:repoId/:filename` | Update diagram in specific repo |
-| `POST` | `/diagram/:repoId` | Create new diagram in specific repo |
-| `DELETE` | `/diagram/:repoId/:filename` | Delete diagram from specific repo |
+| `GET` | `/diagram/:repo/:filename` | Get diagram JSON from specific repo |
+| `PUT` | `/diagram/:repo/:filename` | Update diagram in specific repo |
+| `POST` | `/diagram/:repo` | Create new diagram in specific repo |
+| `DELETE` | `/diagram/:repo/:filename` | Delete diagram from specific repo |
 | `GET` | `/repos` | List all registered repositories |
 
-**WebSocket**: Connect to `ws://localhost:3001` for real-time diagram updates.
+### Repo identifier (`:repo`)
+
+For repo-aware routes, `:repo` is either:
+
+- `global` (uses `~/.aligner/global/`)
+- a URL-encoded absolute repo path (uses `<repoPath>/.aligner/`)
+
+Example:
+
+```bash
+REPO="/tmp/my-repo"
+REPO_ID=$(node -e "console.log(encodeURIComponent(process.argv[1]))" "$REPO")
+curl "http://127.0.0.1:3001/diagram/$REPO_ID/my-diagram.json"
+```
+
+**WebSocket**: Connect to `ws://127.0.0.1:3001` for real-time diagram updates.
 
 ## Project Structure
 
