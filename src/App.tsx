@@ -43,7 +43,7 @@ interface AlignerNode {
   label: string
   position: { x: number; y: number }
   size?: { width: number; height: number }
-  style?: { fill?: string; stroke?: string; cornerRadius?: number }
+  style?: { fill?: string; stroke?: string; cornerRadius?: number; textColor?: string }
   comments?: Comment[]
 }
 
@@ -117,10 +117,12 @@ function App() {
       data: {
         label: n.label,
         comments: n.comments || [],
+        size: n.size,
         style: {
           backgroundColor: n.style?.fill || '#fff',
           border: `2px solid ${n.style?.stroke || '#374151'}`,
           borderRadius: n.style?.cornerRadius || 8,
+          textColor: n.style?.textColor,
         },
       },
     })))
@@ -129,11 +131,23 @@ function App() {
       source: e.from,
       target: e.to,
       label: e.label,
+      type: 'smoothstep',
       animated: e.type === 'dashed',
       style: {
         stroke: '#6b7280',
         strokeWidth: 2,
       },
+      labelStyle: {
+        fill: '#9ca3af',
+        fontSize: 11,
+        fontWeight: 500,
+      },
+      labelBgStyle: {
+        fill: 'rgba(10, 10, 15, 0.8)',
+        fillOpacity: 0.8,
+      },
+      labelBgPadding: [4, 2] as [number, number],
+      labelBgBorderRadius: 4,
       markerEnd: { type: MarkerType.ArrowClosed, color: '#6b7280' },
     })))
   }, [setNodes, setEdges])
@@ -724,6 +738,8 @@ function App() {
               onConnect={onConnect}
               onNodeClick={onNodeClick}
               nodeTypes={nodeTypes}
+              snapToGrid={true}
+              snapGrid={[20, 20]}
               fitView
               deleteKeyCode="Backspace"
               proOptions={{ hideAttribution: true }}

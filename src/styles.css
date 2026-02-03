@@ -458,18 +458,40 @@ body {
   stroke: var(--color-shell-800);
 }
 
+/* Edge labels */
+.react-flow__edge-textwrapper {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.react-flow__edge-text {
+  fill: #e2e8f0 !important;
+}
+
+.react-flow__edge-textbg {
+  fill: rgba(30, 41, 59, 0.95) !important;
+  rx: 4;
+  ry: 4;
+}
+
 /* Custom Node Styles */
 .aligner-node {
   background: #fff;
   border: 2px solid #222;
   border-radius: 8px;
   padding: 12px 16px;
-  min-width: 150px;
+  min-width: 100px;
   color: #000;
   font-size: 13px;
   cursor: pointer;
   transition: box-shadow 0.15s, transform 0.15s;
   position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-sizing: border-box;
 }
 
 .aligner-node:hover {
@@ -488,6 +510,10 @@ body {
   font-weight: 500;
   line-height: 1.4;
   white-space: pre-wrap;
+  text-align: center;
+  width: 100%;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .aligner-node .comment-indicator {

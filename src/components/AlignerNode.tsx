@@ -6,10 +6,12 @@ import { MessageCircle } from 'lucide-react'
 interface AlignerNodeData {
   label: string
   comments?: Array<{ from: string; text: string }>
+  size?: { width: number; height: number }
   style?: {
     backgroundColor?: string
     border?: string
     borderRadius?: number
+    textColor?: string
   }
 }
 
@@ -28,9 +30,12 @@ export const AlignerNode = memo(function AlignerNode({
       transition={{ duration: 0.2, ease: 'easeOut' }}
       className={`aligner-node ${selected ? 'selected' : ''} ${hasComments ? 'has-comments' : ''}`}
       style={{
+        width: nodeData.size?.width,
+        height: nodeData.size?.height,
         backgroundColor: nodeData.style?.backgroundColor || '#fff',
         border: nodeData.style?.border || '2px solid #374151',
         borderRadius: nodeData.style?.borderRadius || 8,
+        color: nodeData.style?.textColor || '#000',
       }}
     >
       <Handle 
