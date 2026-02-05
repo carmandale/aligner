@@ -25,6 +25,8 @@ import {
   Folder,
   ChevronDown,
   ChevronRight,
+  Link,
+  Check,
 } from 'lucide-react'
 import '@xyflow/react/dist/style.css'
 import './styles.css'
@@ -89,9 +91,25 @@ const encodeRepoPath = (repoPath: string) =>
 const diagramKey = (diagram: DiagramListItem) =>
   `${diagram.repoPath}::${diagram.filename}`
 
+// URL parameter helpers for shareable chart links
+const getChartFromURL = (): string | null => {
+  const params = new URLSearchParams(window.location.search)
+  return params.get('chart')
+}
+
+const updateURLWithChart = (chartKey: string | null) => {
+  const url = new URL(window.location.href)
+  if (chartKey) {
+    url.searchParams.set('chart', chartKey)
+  } else {
+    url.searchParams.delete('chart')
+  }
+  window.history.replaceState({}, '', url.toString())
+}
+
 function App() {
   const [diagrams, setDiagrams] = useState<DiagramListItem[]>([])
-  const [selectedKey, setSelectedKey] = useState<string | null>(null)
+  const [selectedKey, setSelectedKey] = useState<string | null>(getChartFromURL)
   const [repos, setRepos] = useState<RepoInfo[]>([])
   const [diagram, setDiagram] = useState<AlignerDiagram | null>(null)
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
@@ -103,10 +121,18 @@ function App() {
   const [filter, setFilter] = useState('')
   const [collapsedRepos, setCollapsedRepos] = useState<{ [repoPath: string]: boolean }>({})
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
   const selectedDiagramRef = useRef<DiagramListItem | null>(null)
 
   const selectedDiagram = diagrams.find(d => diagramKey(d) === selectedKey) || null
   const selectedRepoPath = selectedDiagram?.repoPath || 'global'
+
+  const copyShareLink = useCallback(() => {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    })
+  }, [])
 
   const applyDiagramData = useCallback((d: AlignerDiagram) => {
     setDiagram(d)
@@ -168,9 +194,16 @@ function App() {
       .then((d: DiagramListItem[]) => {
         setDiagrams(d)
         setSelectedKey(prev => {
+          // If we already have a valid selection, keep it
           if (prev && d.some(diagram => diagramKey(diagram) === prev)) {
             return prev
           }
+          // Check URL for a chart param (handles initial load from shared link)
+          const urlChart = getChartFromURL()
+          if (urlChart && d.some(diagram => diagramKey(diagram) === urlChart)) {
+            return urlChart
+          }
+          // Default to first diagram
           return d.length ? diagramKey(d[0]) : null
         })
         if (d.length === 0) {
@@ -209,6 +242,11 @@ function App() {
   useEffect(() => {
     selectedDiagramRef.current = selectedDiagram
   }, [selectedDiagram])
+
+  // Update URL when selection changes (for shareable links)
+  useEffect(() => {
+    updateURLWithChart(selectedKey)
+  }, [selectedKey])
 
   useEffect(() => {
     if (!selectedDiagram) return
@@ -751,7 +789,19 @@ function App() {
                 maskColor="rgba(0,0,0,0.8)"
               />
               <Panel position="top-left" className="diagram-info">
-                <h3>{diagram.name}</h3>
+                <div className="diagram-info-header">
+                  <h3>{diagram.name}</h3>
+                  <motion.button
+                    className="copy-link-btn"
+                    onClick={copyShareLink}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    title="Copy shareable link"
+                  >
+                    {linkCopied ? <Check size={14} /> : <Link size={14} />}
+                    <span>{linkCopied ? 'Copied!' : 'Share'}</span>
+                  </motion.button>
+                </div>
                 <p className="hint">Drag to connect • Backspace to delete</p>
               </Panel>
             </ReactFlow>

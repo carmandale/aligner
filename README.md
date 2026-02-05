@@ -85,6 +85,24 @@ ALIGNER_VIEWER_PORT=5174 \
 - **Real-time sync** - Visual edits save to JSON automatically
 - **AI-readable** - Simple JSON format any LLM can generate and parse
 - **Multi-repo support** - Manage diagrams across multiple repositories from one UI
+- **Shareable links** - URL reflects current chart for easy sharing between agents
+
+## Sharing Charts
+
+Each chart has a unique shareable URL. When viewing "groovetech-profile-media-flow.json", the URL becomes:
+
+```
+http://127.0.0.1:5173/?chart=global::groovetech-profile-media-flow.json
+```
+
+**Share with other agents:**
+1. Click the **Share** button in the diagram info panel (top-left of canvas)
+2. The URL is copied to clipboard
+3. Paste the URL to another agent - they'll open directly to that chart
+
+**URL format:** `?chart=<repoPath>::<filename>`
+- Global diagrams: `?chart=global::my-diagram.json`
+- Repo diagrams: `?chart=/path/to/repo::my-diagram.json`
 
 ## Multi-Repo Support
 
