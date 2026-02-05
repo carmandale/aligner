@@ -62,7 +62,10 @@ interface AlignerDiagram {
   name: string
   nodes: AlignerNode[]
   edges: AlignerEdge[]
-  metadata?: { description?: string }
+  metadata?: { 
+    description?: string
+    legend?: string
+  }
 }
 
 const API = ALIGNER_API_URL
@@ -142,6 +145,7 @@ function App() {
       position: n.position,
       data: {
         label: n.label,
+        nodeType: n.type, // Pass original type (rect, diamond, etc.)
         comments: n.comments || [],
         size: n.size,
         style: {
@@ -149,33 +153,48 @@ function App() {
           border: `2px solid ${n.style?.stroke || '#374151'}`,
           borderRadius: n.style?.cornerRadius || 8,
           textColor: n.style?.textColor,
+          stroke: n.style?.stroke || '#374151',
         },
       },
     })))
-    setEdges(d.edges.map(e => ({
-      id: e.id,
-      source: e.from,
-      target: e.to,
-      label: e.label,
-      type: 'smoothstep',
-      animated: e.type === 'dashed',
-      style: {
-        stroke: '#6b7280',
-        strokeWidth: 2,
-      },
-      labelStyle: {
-        fill: '#9ca3af',
-        fontSize: 11,
-        fontWeight: 500,
-      },
-      labelBgStyle: {
-        fill: 'rgba(10, 10, 15, 0.8)',
-        fillOpacity: 0.8,
-      },
-      labelBgPadding: [4, 2] as [number, number],
-      labelBgBorderRadius: 4,
-      markerEnd: { type: MarkerType.ArrowClosed, color: '#6b7280' },
-    })))
+    setEdges(d.edges.map(e => {
+      const isDashed = e.type === 'dashed'
+      const hasLabel = Boolean(e.label)
+      
+      return {
+        id: e.id,
+        source: e.from,
+        target: e.to,
+        label: e.label,
+        type: 'smoothstep',
+        animated: isDashed,
+        style: {
+          stroke: isDashed ? '#94a3b8' : '#64748b',
+          strokeWidth: isDashed ? 2 : 2.5,
+          strokeDasharray: isDashed ? '6 4' : undefined,
+        },
+        labelStyle: {
+          fill: '#f1f5f9',
+          fontSize: 11,
+          fontWeight: 600,
+          textShadow: '0 1px 2px rgba(0,0,0,0.5)',
+        },
+        labelBgStyle: {
+          fill: hasLabel ? 'rgba(30, 41, 59, 0.95)' : 'transparent',
+          fillOpacity: 0.95,
+          stroke: hasLabel ? 'rgba(100, 116, 139, 0.5)' : 'none',
+          strokeWidth: 1,
+        },
+        labelBgPadding: [6, 4] as [number, number],
+        labelBgBorderRadius: 6,
+        markerEnd: { 
+          type: MarkerType.ArrowClosed, 
+          color: isDashed ? '#94a3b8' : '#64748b',
+          width: 20,
+          height: 20,
+        },
+      }
+    }))
   }, [setNodes, setEdges])
 
   const fetchDiagram = useCallback((diagramInfo: DiagramListItem) => {
@@ -803,6 +822,28 @@ function App() {
                   </motion.button>
                 </div>
                 <p className="hint">Drag to connect • Backspace to delete</p>
+                {diagram.metadata?.legend && (
+                  <div className="diagram-legend">
+                    {diagram.metadata.legend.split(',').map((item, i) => {
+                      const [color, meaning] = item.trim().split('=')
+                      const colorMap: Record<string, string> = {
+                        'Blue': '#3b82f6',
+                        'Green': '#22c55e', 
+                        'Yellow': '#f59e0b',
+                        'Purple': '#6366f1',
+                      }
+                      return (
+                        <div key={i} className="legend-item">
+                          <span 
+                            className="legend-dot" 
+                            style={{ backgroundColor: colorMap[color] || '#6b7280' }}
+                          />
+                          <span className="legend-text">{meaning || color}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </Panel>
             </ReactFlow>
           )}
