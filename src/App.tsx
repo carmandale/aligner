@@ -824,7 +824,7 @@ function App() {
               deleteKeyCode="Backspace"
               proOptions={{ hideAttribution: true }}
             >
-              <Background gap={20} color="#e5e7eb" />
+              <Background gap={20} color="#d1d5db" size={1} />
               <Controls />
               <MiniMap 
                 nodeColor={() => '#3b82f6'}
