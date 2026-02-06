@@ -454,8 +454,12 @@ body {
   border-radius: 8px;
 }
 
-.react-flow__background pattern {
-  stroke: var(--color-shell-800);
+.react-flow__background pattern circle {
+  fill: #e5e7eb !important;
+}
+
+.react-flow__background pattern line {
+  stroke: #e5e7eb !important;
 }
 
 /* Edge labels */
