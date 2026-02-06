@@ -1,0 +1,47 @@
+---
+schema_version: "1.0.0"
+mode: finalize
+date: 2026-02-06T01:19:26.633Z
+session: "aligner-bl2-swimlanes-alignment"
+outcome: "SUCCEEDED"
+primary_bead: "aligner-bl2"
+---
+
+goal: "Add swimlane containers, improve edge routing, fix grid alignment for professional flowchart rendering"
+now: "Implemented swimlanes, white background, fromSide/toSide edge routing, 5px snap grid, and light gray grid dots"
+
+done_this_session:
+  - "Added container/swimlane node type with large colored background rectangles"
+  - "Containers render behind regular nodes via zIndex sorting"
+  - "White canvas background for cleaner professional look"
+  - "Added fromSide/toSide edge properties for explicit routing control"
+  - "Reduced snap grid from 20px to 5px for precise center alignment"
+  - "Fixed grid dots to light gray via CSS override (.react-flow__background pattern)"
+  - "Added handles on all 4 sides of nodes for flexible edge connections"
+  - "Updated groovetech-profile-media-flow.json with 3 swimlanes (Media Server, Cloud, GMP)"
+  - "Changed edges from smoothstep to bezier for cleaner curves"
+
+decisions:
+  - "Use transparent/light gray grid dots instead of black (user preference)"
+  - "5px snap grid allows center alignment of nodes with different widths"
+  - "Swimlane colors: blue for Media Server, green for Cloud/GCS, purple for GMP/VisionOS"
+  - "Edge routing controlled via JSON fromSide/toSide properties"
+
+files:
+  - "src/App.tsx - edge routing, snap grid, background color"
+  - "src/components/AlignerNode.tsx - container type, 4-side handles"
+  - "src/styles.css - swimlane CSS, grid dot color override"
+  - "~/.aligner/global/groovetech-profile-media-flow.json - updated chart with swimlanes"
+
+git:
+  branch: "main"
+  commits:
+    - "bf56266 - Add shareable chart URLs"
+    - "7fbe729 - Simplified node rendering"
+    - "a3a240f - Add swimlane/container support"
+    - "bcecf25 - Fix edge routing and snap grid alignment"
+    - "53c8cdc - White background, bezier curves"
+    - "f2a9781 - Subtle grid dots, taller GMP swimlane"
+    - "4c8d46e - Transparent dots, 5px snap"
+    - "3d4dfb7 - Fix grid dots to light gray via CSS"
+  remote: "https://github.com/carmandale/aligner.git"
