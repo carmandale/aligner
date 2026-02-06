@@ -139,22 +139,35 @@ function App() {
 
   const applyDiagramData = useCallback((d: AlignerDiagram) => {
     setDiagram(d)
-    setNodes(d.nodes.map(n => ({
-      id: n.id,
-      type: 'aligner',
-      position: n.position,
-      // Don't pass size - let nodes auto-size to content
-      data: {
-        label: n.label,
-        nodeType: n.type,
-        comments: n.comments || [],
-        style: {
-          backgroundColor: n.style?.fill || '#fff',
-          borderRadius: n.style?.cornerRadius || 6,
-          stroke: n.style?.stroke || '#374151',
+    // Sort nodes: containers first (render behind), then regular nodes
+    const sortedNodes = [...d.nodes].sort((a, b) => {
+      const aIsContainer = a.type === 'container' || a.type === 'group'
+      const bIsContainer = b.type === 'container' || b.type === 'group'
+      if (aIsContainer && !bIsContainer) return -1
+      if (!aIsContainer && bIsContainer) return 1
+      return 0
+    })
+    
+    setNodes(sortedNodes.map((n) => {
+      const isContainer = n.type === 'container' || n.type === 'group'
+      return {
+        id: n.id,
+        type: 'aligner',
+        position: n.position,
+        zIndex: isContainer ? 0 : 10, // Containers behind regular nodes
+        data: {
+          label: n.label,
+          nodeType: n.type,
+          comments: n.comments || [],
+          size: n.size, // Pass size for containers
+          style: {
+            backgroundColor: n.style?.fill || '#fff',
+            borderRadius: n.style?.cornerRadius || 6,
+            stroke: n.style?.stroke || '#374151',
+          },
         },
-      },
-    })))
+      }
+    }))
     setEdges(d.edges.map(e => {
       const isDashed = e.type === 'dashed'
       

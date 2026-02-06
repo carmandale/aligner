@@ -14,11 +14,6 @@ interface AlignerNodeData {
   }
 }
 
-// Detect section headers by pattern
-const isSectionHeader = (label: string): boolean => {
-  return /^[A-Z][A-Z\s\-]+(\([^)]+\))?$/.test(label.trim())
-}
-
 export const AlignerNode = memo(function AlignerNode({
   data,
   selected,
@@ -26,35 +21,43 @@ export const AlignerNode = memo(function AlignerNode({
   const nodeData = data as unknown as AlignerNodeData
   const commentCount = nodeData.comments?.length || 0
   const hasComments = commentCount > 0
-  const isDiamond = nodeData.nodeType === 'diamond'
-  const isSection = isSectionHeader(nodeData.label)
+  const nodeType = nodeData.nodeType || 'rect'
   
   const bgColor = nodeData.style?.backgroundColor || '#ffffff'
   const strokeColor = nodeData.style?.stroke || '#374151'
+  const size = nodeData.size
 
-  // Section header
-  if (isSection) {
+  // SWIMLANE/CONTAINER - large background rectangle
+  if (nodeType === 'container' || nodeType === 'group') {
     return (
-      <div className="section-header" style={{ borderLeftColor: strokeColor }}>
-        {nodeData.label}
+      <div 
+        className="swimlane"
+        style={{
+          width: size?.width || 400,
+          height: size?.height || 300,
+          backgroundColor: bgColor,
+          borderColor: strokeColor,
+        }}
+      >
+        <div className="swimlane-label" style={{ color: strokeColor }}>
+          {nodeData.label}
+        </div>
       </div>
     )
   }
 
-  // Diamond decision node - use hexagon-ish shape, NOT rotated text
-  if (isDiamond) {
+  // DIAMOND - decision node with actual diamond shape
+  if (nodeType === 'diamond') {
     return (
       <div className={`diamond-node ${selected ? 'selected' : ''}`}>
         <Handle type="target" position={Position.Top} className="handle" />
         <Handle type="target" position={Position.Left} id="left-in" className="handle" />
         
         <div 
-          className="diamond-inner"
+          className="diamond-shape"
           style={{ backgroundColor: bgColor, borderColor: strokeColor }}
-        >
-          <span className="diamond-icon">◆</span>
-          <span className="diamond-text">{nodeData.label}</span>
-        </div>
+        />
+        <div className="diamond-text">{nodeData.label}</div>
         
         {hasComments && (
           <div className="comment-badge">
@@ -69,14 +72,14 @@ export const AlignerNode = memo(function AlignerNode({
     )
   }
 
-  // Standard node - auto-sized to content
+  // STANDARD NODE - rectangle with content
   return (
     <div
       className={`flow-node ${selected ? 'selected' : ''} ${hasComments ? 'has-comments' : ''}`}
       style={{
         backgroundColor: bgColor,
         borderColor: strokeColor,
-        borderRadius: nodeData.style?.borderRadius || 6,
+        borderRadius: nodeData.style?.borderRadius || 4,
       }}
     >
       <Handle type="target" position={Position.Top} className="handle" />

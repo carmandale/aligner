@@ -475,88 +475,92 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SECTION HEADERS
+   SWIMLANES/CONTAINERS - Large background groupings
    ═══════════════════════════════════════════════════════════════════════════ */
-.section-header {
-  background: rgba(30, 41, 59, 0.85);
-  border-left: 3px solid;
-  padding: 6px 12px;
-  font-size: 11px;
+.swimlane {
+  border: 2px solid;
+  border-radius: 8px;
+  position: relative;
+  pointer-events: none; /* Allow clicking through to nodes inside */
+}
+
+.swimlane-label {
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.5px;
-  color: #94a3b8;
+  text-transform: uppercase;
+  pointer-events: auto;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   DIAMOND NODES - Decision points, readable text
+   DIAMOND NODES - Actual diamond shape for decisions
    ═══════════════════════════════════════════════════════════════════════════ */
 .diamond-node {
   position: relative;
   cursor: pointer;
-}
-
-.diamond-node .diamond-inner {
-  border: 2px solid;
-  border-radius: 4px;
-  padding: 10px 14px;
-  text-align: center;
+  width: 100px;
+  height: 100px;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 4px;
-  /* Visual hint this is a decision - angled corners */
-  clip-path: polygon(
-    8px 0%, calc(100% - 8px) 0%, 100% 8px,
-    100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%,
-    0% calc(100% - 8px), 0% 8px
-  );
+  justify-content: center;
 }
 
-.diamond-node .diamond-icon {
-  font-size: 10px;
-  color: #b45309;
+.diamond-node .diamond-shape {
+  position: absolute;
+  width: 70%;
+  height: 70%;
+  border: 2px solid;
+  transform: rotate(45deg);
+  border-radius: 4px;
 }
 
 .diamond-node .diamond-text {
-  font-size: 11px;
+  position: relative;
+  z-index: 1;
+  font-size: 12px;
   font-weight: 600;
   color: #78350f;
   line-height: 1.3;
+  text-align: center;
   white-space: pre-wrap;
+  padding: 4px;
 }
 
-.diamond-node.selected .diamond-inner {
+.diamond-node.selected .diamond-shape {
   box-shadow: 0 0 0 2px var(--color-aligner-500);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   FLOW NODES - Standard nodes, auto-size to content
+   FLOW NODES - Standard rectangles
    ═══════════════════════════════════════════════════════════════════════════ */
 .flow-node {
   border: 2px solid;
-  padding: 8px 12px;
+  padding: 10px 16px;
   cursor: pointer;
   position: relative;
   text-align: center;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  background: white;
 }
 
 .flow-node:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  filter: brightness(0.97);
 }
 
 .flow-node.selected {
-  box-shadow: 0 0 0 2px var(--color-aligner-500);
+  box-shadow: 0 0 0 3px var(--color-aligner-500);
 }
 
 .flow-node.has-comments {
-  box-shadow: 0 0 0 2px var(--color-accent-yellow);
+  box-shadow: 0 0 0 3px var(--color-accent-yellow);
 }
 
 .flow-node .node-text {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
-  line-height: 1.35;
+  line-height: 1.4;
   color: #1e293b;
   white-space: pre-wrap;
 }
@@ -565,26 +569,27 @@ body {
    HANDLES & BADGES
    ═══════════════════════════════════════════════════════════════════════════ */
 .handle {
-  width: 6px !important;
-  height: 6px !important;
-  background: #94a3b8 !important;
-  border: none !important;
+  width: 8px !important;
+  height: 8px !important;
+  background: #64748b !important;
+  border: 2px solid white !important;
+  border-radius: 50% !important;
 }
 
 .comment-badge {
   position: absolute;
-  top: -6px;
-  right: -6px;
+  top: -8px;
+  right: -8px;
   background: var(--color-accent-yellow);
   color: #000;
-  border-radius: 8px;
-  min-width: 16px;
-  height: 16px;
+  border-radius: 10px;
+  min-width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 2px;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   z-index: 10;
 }
