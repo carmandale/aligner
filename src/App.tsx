@@ -819,12 +819,12 @@ function App() {
               onNodeClick={onNodeClick}
               nodeTypes={nodeTypes}
               snapToGrid={true}
-              snapGrid={[20, 20]}
+              snapGrid={[5, 5]}
               fitView
               deleteKeyCode="Backspace"
               proOptions={{ hideAttribution: true }}
             >
-              <Background gap={20} color="#d1d5db" size={1} />
+              <Background gap={20} color="transparent" />
               <Controls />
               <MiniMap 
                 nodeColor={() => '#3b82f6'}
