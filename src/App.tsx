@@ -194,7 +194,7 @@ function App() {
         sourceHandle: e.fromSide ? sideToSourceHandle[e.fromSide] : undefined,
         targetHandle: e.toSide ? sideToTargetHandle[e.toSide] : undefined,
         label: e.label,
-        type: 'smoothstep',
+        type: 'default', // bezier curves - cleaner than smoothstep
         style: {
           stroke: '#64748b',
           strokeWidth: 2,
@@ -824,7 +824,7 @@ function App() {
               deleteKeyCode="Backspace"
               proOptions={{ hideAttribution: true }}
             >
-              <Background gap={20} color="#1f1f2e" />
+              <Background gap={20} color="#e5e7eb" />
               <Controls />
               <MiniMap 
                 nodeColor={() => '#3b82f6'}

@@ -408,7 +408,7 @@ body {
 .canvas {
   flex: 1;
   position: relative;
-  background: var(--color-shell-950);
+  background: #ffffff;
 }
 
 .diagram-info {
