@@ -55,6 +55,8 @@ interface AlignerEdge {
   to: string
   type?: string
   label?: string
+  fromSide?: 'top' | 'bottom' | 'left' | 'right'
+  toSide?: 'top' | 'bottom' | 'left' | 'right'
 }
 
 interface AlignerDiagram {
@@ -171,10 +173,26 @@ function App() {
     setEdges(d.edges.map(e => {
       const isDashed = e.type === 'dashed'
       
+      // Map side names to handle IDs
+      const sideToSourceHandle: Record<string, string> = {
+        'right': 'right',
+        'left': 'left',
+        'top': 'top-out',
+        'bottom': 'bottom',
+      }
+      const sideToTargetHandle: Record<string, string> = {
+        'left': 'left',
+        'right': 'right',
+        'top': 'top',
+        'bottom': 'bottom-in',
+      }
+      
       return {
         id: e.id,
         source: e.from,
         target: e.to,
+        sourceHandle: e.fromSide ? sideToSourceHandle[e.fromSide] : undefined,
+        targetHandle: e.toSide ? sideToTargetHandle[e.toSide] : undefined,
         label: e.label,
         type: 'smoothstep',
         style: {
@@ -183,12 +201,12 @@ function App() {
           strokeDasharray: isDashed ? '5 3' : undefined,
         },
         labelStyle: {
-          fill: '#e2e8f0',
-          fontSize: 10,
-          fontWeight: 500,
+          fill: '#374151',
+          fontSize: 11,
+          fontWeight: 600,
         },
         labelBgStyle: {
-          fill: '#1e293b',
+          fill: '#f8fafc',
         },
         labelBgPadding: [4, 3] as [number, number],
         labelBgBorderRadius: 4,

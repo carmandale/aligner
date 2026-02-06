@@ -50,8 +50,9 @@ export const AlignerNode = memo(function AlignerNode({
   if (nodeType === 'diamond') {
     return (
       <div className={`diamond-node ${selected ? 'selected' : ''}`}>
-        <Handle type="target" position={Position.Top} className="handle" />
-        <Handle type="target" position={Position.Left} id="left-in" className="handle" />
+        {/* Target handles */}
+        <Handle type="target" position={Position.Top} id="top" className="handle" />
+        <Handle type="target" position={Position.Left} id="left" className="handle" />
         
         <div 
           className="diamond-shape"
@@ -65,9 +66,9 @@ export const AlignerNode = memo(function AlignerNode({
           </div>
         )}
         
-        <Handle type="source" position={Position.Bottom} className="handle" />
+        {/* Source handles */}
+        <Handle type="source" position={Position.Bottom} id="bottom" className="handle" />
         <Handle type="source" position={Position.Right} id="right" className="handle" />
-        <Handle type="source" position={Position.Left} id="left" className="handle" />
       </div>
     )
   }
@@ -82,8 +83,10 @@ export const AlignerNode = memo(function AlignerNode({
         borderRadius: nodeData.style?.borderRadius || 4,
       }}
     >
-      <Handle type="target" position={Position.Top} className="handle" />
-      <Handle type="target" position={Position.Left} id="left-in" className="handle" />
+      {/* Target handles (inputs) */}
+      <Handle type="target" position={Position.Top} id="top" className="handle" />
+      <Handle type="target" position={Position.Left} id="left" className="handle" />
+      <Handle type="target" position={Position.Bottom} id="bottom-in" className="handle" />
       
       <div className="node-text">{nodeData.label}</div>
       
@@ -93,8 +96,10 @@ export const AlignerNode = memo(function AlignerNode({
         </div>
       )}
       
-      <Handle type="source" position={Position.Bottom} className="handle" />
+      {/* Source handles (outputs) */}
+      <Handle type="source" position={Position.Bottom} id="bottom" className="handle" />
       <Handle type="source" position={Position.Right} id="right" className="handle" />
+      <Handle type="source" position={Position.Top} id="top-out" className="handle" />
     </div>
   )
 })
